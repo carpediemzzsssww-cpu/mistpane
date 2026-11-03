@@ -2,15 +2,11 @@
 
 ## 照片
 
-`assets/photos/` 中 `winter-valley.jpg`、`snow-cabin.jpg`、`coast.jpg`、`cloud-sea.jpg`、`cloud-dusk.jpg` 五张旅行照片由项目创建者提供，仅授权在本项目中展示，不适用代码的 MIT 许可证。另作他用请先取得权利人的许可。
+`assets/photos/` 及其中的 `thumbs/` 是项目创建者提供的 20 张旅行照片与缩略图，仅授权在本项目中展示，不适用代码的 MIT 许可证。另作他用请先取得权利人的许可。
 
-`fog-house.jpg`：Lukas Neasi，[A house in winter fog](https://commons.wikimedia.org/wiki/File:A_house_in_winter_fog_(Unsplash).jpg)，CC0。照片色彩在浏览器渲染时作了低饱和度处理。
+照片导出已转正方向、缩放至最长边 2048px、重新编码，不携带 EXIF、GPS 或原文件名。两张云海照片从原始舷窗照片内裁取，去掉原照片的实物窗框。页面显示时适当降低饱和度，突出玻璃上的雾气与笔迹。
 
-个人照片发布文件已转正方向、缩放至最长边 2048px、重新编码；不携带 EXIF、GPS 或原文件名。两张云层照片从原始舷窗照片内裁取，去掉原照片的实物窗框。
-
-`rain-street.jpg`：Nenad Stojković（Wikimedia 用户 Shixart1985），[Warm street lights glow along a narrow city street filled with parked cars on a rainy night](https://commons.wikimedia.org/wiki/File:Warm_street_lights_glow_along_a_narrow_city_street_filled_with_parked_cars_on_a_rainy_night.jpg)，[CC BY 2.0](https://creativecommons.org/licenses/by/2.0/)。缩放、重新压缩并移除元数据，页面渲染时降低饱和度；界面保留作者、来源和许可链接。
-
-`lisbon-rain.jpg`：Terry Kearney，[LISBON IN THE NIGHT RAIN](https://commons.wikimedia.org/wiki/File:LISBON_IN_THE_NIGHT_RAIN_(10604014063).jpg)，[CC0](https://creativecommons.org/publicdomain/zero/1.0/)。缩放、重新压缩并移除元数据，页面渲染时降低饱和度。
+当前版本全部使用项目创建者的照片。之前版本中的雾林与外部雨夜街景已从当前资源和背景列表移除，历史提交保留对应的素材许可记录。
 
 ## 代码与参考
 

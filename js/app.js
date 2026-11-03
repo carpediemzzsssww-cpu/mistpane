@@ -601,29 +601,46 @@ function sceneBokeh(w, h, seed) {
 
 // Photos are local, metadata-free exports. Focus points keep the subject in a landscape crop.
 var SCENES = [
-  { name: '雾林里，一间小屋', file: 'assets/photos/fog-house.jpg', focus: [0.43, 0.57], tint: [0.86, 0.90, 0.91], saturation: 0.58, make: scenePines, seed: 90210 },
-  { name: '雪谷，天还没暗', file: 'assets/photos/winter-valley.jpg', focus: [0.51, 0.51], tint: [0.89, 0.91, 0.89], saturation: 0.48, make: scenePines, seed: 90210 },
-  { name: '雪地里，一盏暖灯', file: 'assets/photos/snow-cabin.jpg', focus: [0.57, 0.68], tint: [0.86, 0.90, 0.92], saturation: 0.52, make: scenePines, seed: 90210 },
-  { name: '冷海边的红屋', file: 'assets/photos/coast.jpg', focus: [0.52, 0.46], tint: [0.86, 0.90, 0.91], saturation: 0.46, make: scenePines, seed: 90210 },
-  { name: '云海之上', file: 'assets/photos/cloud-sea.jpg', focus: [0.50, 0.45], tint: [0.88, 0.92, 0.96], saturation: 0.82, make: scenePines, seed: 90210 },
-  { name: '日落，云层安静下来', file: 'assets/photos/cloud-dusk.jpg', focus: [0.52, 0.48], tint: [0.93, 0.89, 0.83], saturation: 0.55, make: sceneBokeh, seed: 77112 },
-  { name: '雨夜，一条暖色的街', file: 'assets/photos/rain-street.jpg', focus: [0.52, 0.57], tint: [0.94, 0.89, 0.80], saturation: 0.52, make: sceneBokeh, seed: 77112, credit: true },
-  { name: '里斯本，雨还没停', file: 'assets/photos/lisbon-rain.jpg', focus: [0.43, 0.52], tint: [0.93, 0.89, 0.81], saturation: 0.50, make: sceneBokeh, seed: 77112 }
+  {"name": "阳光与云海", "file": "assets/photos/cloud-dusk.jpg", "thumb": "assets/photos/thumbs/cloud-dusk.jpg", "focus": [0.28, 0.46], "tint": [0.93, 0.91, 0.87], "saturation": 0.78, "flight": true, "make": scenePines, "seed": 90210 },
+  {"name": "云海之上", "file": "assets/photos/cloud-sea.jpg", "thumb": "assets/photos/thumbs/cloud-sea.jpg", "focus": [0.5, 0.45], "tint": [0.89, 0.92, 0.94], "saturation": 0.82, "flight": true, "make": scenePines, "seed": 90210 },
+  {"name": "雪谷", "file": "assets/photos/winter-valley.jpg", "thumb": "assets/photos/thumbs/winter-valley.jpg", "focus": [0.51, 0.51], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "雪地暖灯", "file": "assets/photos/snow-cabin.jpg", "thumb": "assets/photos/thumbs/snow-cabin.jpg", "focus": [0.57, 0.68], "tint": [0.89, 0.92, 0.94], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "雪屋的黄昏", "file": "assets/photos/snow-roof.jpg", "thumb": "assets/photos/thumbs/snow-roof.jpg", "focus": [0.5, 0.55], "tint": [0.89, 0.92, 0.94], "saturation": 0.62, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "冷海边的红屋", "file": "assets/photos/coast.jpg", "thumb": "assets/photos/thumbs/coast.jpg", "focus": [0.52, 0.46], "tint": [0.89, 0.92, 0.94], "saturation": 0.55, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "船上的蓝调时刻", "file": "assets/photos/ferry-dusk.jpg", "thumb": "assets/photos/thumbs/ferry-dusk.jpg", "focus": [0.58, 0.44], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "雪中的车站", "file": "assets/photos/snow-stop.jpg", "thumb": "assets/photos/thumbs/snow-stop.jpg", "focus": [0.5, 0.54], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "雨夜咖啡馆", "file": "assets/photos/cafe-rain.jpg", "thumb": "assets/photos/thumbs/cafe-rain.jpg", "focus": [0.5, 0.54], "tint": [0.93, 0.91, 0.87], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "咖啡馆露台", "file": "assets/photos/cafe-terrace.jpg", "thumb": "assets/photos/thumbs/cafe-terrace.jpg", "focus": [0.5, 0.5], "tint": [0.93, 0.91, 0.87], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "蓝调街巷", "file": "assets/photos/blue-alley.jpg", "thumb": "assets/photos/thumbs/blue-alley.jpg", "focus": [0.5, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "河边的雨后", "file": "assets/photos/river-street.jpg", "thumb": "assets/photos/thumbs/river-street.jpg", "focus": [0.5, 0.52], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "街角星灯", "file": "assets/photos/city-dusk.jpg", "thumb": "assets/photos/thumbs/city-dusk.jpg", "focus": [0.5, 0.47], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "暮色广场", "file": "assets/photos/evening-square.jpg", "thumb": "assets/photos/thumbs/evening-square.jpg", "focus": [0.5, 0.45], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "夜里的橱窗", "file": "assets/photos/shop-window.jpg", "thumb": "assets/photos/thumbs/shop-window.jpg", "focus": [0.5, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "车窗外的街道", "file": "assets/photos/bus-street.jpg", "thumb": "assets/photos/thumbs/bus-street.jpg", "focus": [0.5, 0.52], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "傍晚的教堂", "file": "assets/photos/basilica.jpg", "thumb": "assets/photos/thumbs/basilica.jpg", "focus": [0.5, 0.4], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "河上的灯火", "file": "assets/photos/river-lights.jpg", "thumb": "assets/photos/thumbs/river-lights.jpg", "focus": [0.5, 0.48], "tint": [0.93, 0.91, 0.87], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "乐园亮灯了", "file": "assets/photos/night-garden.jpg", "thumb": "assets/photos/thumbs/night-garden.jpg", "focus": [0.55, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
+  {"name": "一起看日落", "file": "assets/photos/wing-sunset.jpg", "thumb": "assets/photos/thumbs/wing-sunset.jpg", "focus": [0.52, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.7, "flight": false, "make": scenePines, "seed": 90210 }
 ];
-var WINDOW_SCENES = [0, 6, 1, 3, 4];
 var originalLook = /(?:[?&])look=original(?:&|$)/.test(location.search);
 var softMist = !originalLook && !/(?:[?&])look=previous(?:&|$)/.test(location.search);
 var debugMode = /(?:[?&])debug(?:[=&]|$)/.test(location.search);
-var sceneMatch = location.search.match(/[?&]scene=([0-7])(?:&|$)/);
+var sceneMatch = location.search.match(/[?&]scene=(1[0-9]|[0-9])(?:&|$)/);
 var windowMatch = location.search.match(/[?&]window=([0-4])(?:&|$)/);
 
+var photoUse = 0;
 function loadScene(index) {
   var scene = SCENES[index];
+  scene.used = ++photoUse;
   if (scene.image || scene.loading || scene.failed) return;
   scene.loading = true;
   var image = new Image();
   image.onload = function () {
     scene.image = image; scene.loading = false;
+    // Retain only three full-size images; the contact sheet uses tiny exports.
+    var cached = SCENES.filter(function (item) { return item.image && item !== SCENES[S.sceneIndex]; });
+    cached.sort(function (a, b) { return b.used - a.used; });
+    while (cached.length > 2) cached.pop().image = null;
     if (S.sceneIndex === index && !S.customImg) buildBackground();
   };
   image.onerror = function () {
@@ -639,7 +656,7 @@ function loadScene(index) {
 /* ------------------------------------------------------------------ 全局状态 */
 var S = {
   cssW: 0, cssH: 0, dpr: 1, bufW: 1, bufH: 1,
-  sceneIndex: sceneMatch ? Number(sceneMatch[1]) : WINDOW_SCENES[windowMatch ? Number(windowMatch[1]) : 0], customImg: null,
+  sceneIndex: sceneMatch ? Number(sceneMatch[1]) : (windowMatch && Number(windowMatch[1]) === 2 ? 2 : 0), customImg: null,
   micOn: false, micLevel: 0, micEnv: 0,
   micDriftX: 0, micDriftY: 0, micDriftT: 0, micDriftA: 0,
   holdLevel: 0, holdX: 0, holdY: 0,
@@ -649,9 +666,9 @@ var S = {
   pointerType: 'mouse', pointerId: null,
   down: false, mode: 'wipe', downT: 0, lastMoveT: 0,
   lastX: 0.5, lastY: 0.47, downX: 0.5, downY: 0.47,
-  windowStyle: windowMatch ? Number(windowMatch[1]) : 0,
+  windowStyle: windowMatch && Number(windowMatch[1]) === 2 ? 2 : 4,
   rainAmt: 0, snowAmt: 0, melt: 1,
-  weather: 'rain', weatherLevel: 0.6, weatherHold: 0,
+  weather: 'clear', weatherLevel: 0, weatherHold: 0,
   wind: 0, windTarget: 0, windT: 0,
   lastTapT: 0, lastTapX: 0.5, lastTapY: 0.47,
   time: 0
@@ -695,6 +712,7 @@ var naturalAcc = 0;
 /* 外层降雨（窗户外侧，位于雾气层之后） */
 var rainDrops = [], rainAcc = 0;
 var snowFlakes = [], snowAcc = 0;
+var rainStreaks = [];
 var rainIntensity = 0.6, rainTarget = 0.6, rainIntensityT = 0;
 var rainScale = 0.5, rw = 0, rh = 0;
 var rainTrailC = null, rainTrailCtx = null;
@@ -1027,6 +1045,8 @@ function setupRain() {
   rainCanvas = mkCanvas(rw, rh); rainCtx = rainCanvas.getContext('2d');
   rainDrops.length = 0; rainAcc = 0;
   snowFlakes.length = 0; snowAcc = 0;
+  rainStreaks.length = 0;
+  rainTexReady = false;
 }
 
 function drawRainTrail(x0, y0, x1, y1, r) {
@@ -1047,27 +1067,71 @@ function drawRainTrail(x0, y0, x1, y1, r) {
   }
 }
 
+// Weather occupies the visible opening, so switching never waits for particles
+// to fall through the hidden cabin wall. Coordinates here are weather texels.
+function weatherBounds() {
+  var ap = MIST_WINDOWS.geometry(S.windowStyle, S.cssW, S.cssH);
+  return { x: ap.x * rainScale, y: ap.y * rainScale, w: ap.w * rainScale, h: ap.h * rainScale };
+}
+function spawnSnow(b, spread) {
+  var depth = Math.pow(Math.random(), 1.8);
+  snowFlakes.push({
+    x: b.x + Math.random() * b.w, y: b.y + (spread ? Math.random() * b.h : -5 * rainScale),
+    r: (0.8 + depth * 3.1) * rainScale,
+    vy: (14 + depth * 38) * rainScale,
+    sway: (3 + depth * 12) * rainScale, swaySpeed: 0.6 + Math.random() * 1.4,
+    phase: Math.random() * Math.PI * 2, soft: 0.20 + depth * 0.65,
+    age: 0, life: 50, depth: depth
+  });
+}
+function newRainStreak(b, spread) {
+  var depth = Math.random();
+  return { x: b.x + Math.random() * b.w, y: b.y + (spread ? Math.random() * b.h : -22 * rainScale),
+    speed: (220 + depth * 270) * rainScale, length: (11 + depth * 23) * rainScale,
+    width: (0.5 + depth * 0.7) * rainScale, alpha: 0.22 + depth * 0.34 };
+}
+function primeWeather(mode) {
+  if (!rainCanvas) return;
+  var b = weatherBounds(), n = clamp(b.w * b.h / (rainScale * rainScale * 150000), 0.65, 1.8) * (qualityTier === 0 ? 1 : 0.7);
+  if (mode === 'rain') {
+    if (!rainStreaks.length) for (var i = 0; i < 60 * n; i++) rainStreaks.push(newRainStreak(b, true));
+    if (!rainDrops.length) rainAcc = 14 * n;
+  }
+  if (mode === 'snow' && !snowFlakes.length) for (var j = 0; j < 72 * n; j++) spawnSnow(b, true);
+}
+function updateWeatherButton() {
+  var names = { clear: '晴', rain: '雨', snow: '雪' };
+  var paths = {
+    clear: '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4L19 5"></path>',
+    rain: '<path d="M6 15a4 4 0 0 1 0-8 6 6 0 0 1 11-1 4.5 4.5 0 0 1 1 9M7 18l-1 3m6-3-1 3m6-3-1 3"></path>',
+    snow: '<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9 4l3 3 3-3M9 20l3-3 3 3M4 10l4-1-1-4m10 14-1-4 4-1M4 14l4 1-1 4m10-14-1 4 4 1"></path>'
+  };
+  btnWeather.querySelector('svg').innerHTML = paths[S.weather];
+  btnWeather.setAttribute('aria-label', '切换天气，当前：' + names[S.weather]);
+  btnWeather.title = '当前：' + names[S.weather] + ' · 晴 / 雨 / 雪';
+}
 function setWeather(mode, level, name) {
   S.weather = mode;
   S.weatherLevel = clamp(level, 0, 1);
-  S.weatherHold = 18;            /* 设定后保持 18 秒再恢复自然起伏 */
+  S.weatherHold = 18;
   rainTarget = S.weatherLevel;
+  rainIntensity = S.weatherLevel;
+  primeWeather(mode);
+  updateWeatherButton();
   showLabel(name);
   hideHint();
 }
-/* 随机天气：雨/雪/放晴按权重抽取，强度也是随机的 */
 function randomWeather() {
-  var p = Math.random(), mode = p < 0.55 ? 'rain' : (p < 0.85 ? 'snow' : 'clear');
-  var lv = 0.18 + Math.random() * 0.82, name;
-  if (mode === 'clear') { name = '放晴'; lv = 0; }
-  else if (mode === 'rain') name = lv > 0.72 ? '大雨' : (lv > 0.42 ? '中雨' : '小雨');
-  else name = lv > 0.72 ? '大雪' : (lv > 0.42 ? '中雪' : '小雪');
-  setWeather(mode, lv, name);
+  // Predictable cycle: every activation gives a different, immediate result.
+  var mode = S.weather === 'clear' ? 'rain' : S.weather === 'rain' ? 'snow' : 'clear';
+  setWeather(mode, mode === 'clear' ? 0 : 0.68, mode === 'rain' ? '下雨了' : mode === 'snow' ? '下雪了' : '放晴');
 }
 
 function updateRain(dt) {
   if (!rainCanvas) return;
   var i, d, f, cap = qualityTier === 0 ? 70 : 45;
+  var bounds = weatherBounds();
+  primeWeather(S.weather);
 
   /* 天气强度：用户设定保持约 18 秒，之后恢复自然起伏 */
   if (S.weatherHold > 0) {
@@ -1088,11 +1152,11 @@ function updateRain(dt) {
   if (S.windT <= 0) { S.windT = 4 + Math.random() * 8; S.windTarget = (Math.random() - 0.5) * 34; }
   S.wind += (S.windTarget - S.wind) * Math.min(1, dt * 0.4);
   /* 雨雪强度的视觉缓存（供着色器做空气透视） */
-  S.rainAmt += ((S.weather === 'rain' ? rainIntensity : 0) - S.rainAmt) * Math.min(1, dt * 0.5);
-  S.snowAmt += ((S.weather === 'snow' ? rainIntensity : 0) - S.snowAmt) * Math.min(1, dt * 0.5);
+  S.rainAmt += ((S.weather === 'rain' ? rainIntensity : 0) - S.rainAmt) * (1 - Math.exp(-dt * 10));
+  S.snowAmt += ((S.weather === 'snow' ? rainIntensity : 0) - S.snowAmt) * (1 - Math.exp(-dt * 10));
 
   /* 生成：尺寸按幂律分布（小滴多、大滴少），雨越大平均雨滴越大 */
-  var areaN = (rw * rh) / 240000;
+  var areaN = clamp(bounds.w * bounds.h / (rainScale * rainScale * 200000), 0.6, 1.8);
   rainAcc += dt * (S.weather === 'rain' ? (9 + 26 * rainIntensity) : 0) * areaN * (qualityTier === 0 ? 1 : 0.7);
   while (rainAcc >= 1) {
     rainAcc -= 1;
@@ -1104,8 +1168,8 @@ function updateRain(dt) {
     if (rc < 3) cssV = Math.min(cssV, 1.5 + Math.random() * 2.0);  /* 小滴几乎不动 */
     cssV = clamp(cssV, 0.4, 95);
     rainDrops.push({
-      x: Math.random() * rw,
-      y: (Math.random() < 0.25) ? Math.random() * rh * 0.6 : (-sz + Math.random() * rh * 0.08),
+      x: bounds.x + Math.random() * bounds.w,
+      y: bounds.y + Math.random() * bounds.h,
       r: sz, vy: cssV * 0.1 / rainScale,
       maxV: cssV / rainScale, accel: 0.8 + Math.random() * 2.0, vf: vf,
       age: 0, life: 3 + Math.random() * 6, seed: Math.random(),
@@ -1113,24 +1177,18 @@ function updateRain(dt) {
     });
   }
 
-  /* ---- 雪：飘落摇曳 + 风偏，大小远近不一 ---- */
-  snowAcc += dt * (S.weather === 'snow' ? (14 + 55 * rainIntensity) : 0) * areaN * (qualityTier === 0 ? 1 : 0.7);
+  /* Far flakes drift slowly; a few near flakes are larger and out of focus. */
+  snowAcc += dt * (S.weather === 'snow' ? (5 + 10 * rainIntensity) : 0) * areaN;
   while (snowAcc >= 1) {
     snowAcc -= 1;
-    if (snowFlakes.length >= (qualityTier === 0 ? 100 : 60)) break;
-    var fr = 0.8 + Math.pow(Math.random(), 1.8) * 4.6;
-    var frc = fr / rainScale;
-    snowFlakes.push({
-      x: Math.random() * rw,
-      y: (Math.random() < 0.3) ? Math.random() * rh : (-fr + Math.random() * rh * 0.06),
-      r: fr,
-      vy: (6 + frc * 4 + Math.random() * 20) / rainScale,   /* texels/s */
-      sway: (3 + Math.random() * 10) / rainScale,
-      swaySpeed: 0.6 + Math.random() * 1.6,
-      phase: Math.random() * Math.PI * 2,
-      soft: 0.30 + 0.55 * Math.min(1, fr / 4.5),
-      age: 0, life: 8 + Math.random() * 8
-    });
+    if (snowFlakes.length >= (qualityTier === 0 ? 145 : 85)) break;
+    spawnSnow(bounds, false);
+  }
+  for (i = 0; i < rainStreaks.length; i++) {
+    var streak = rainStreaks[i];
+    streak.y += streak.speed * dt;
+    streak.x += (S.wind * rainScale - streak.speed * 0.045) * dt;
+    if (streak.y > bounds.y + bounds.h + streak.length || streak.x < bounds.x - 10) rainStreaks[i] = newRainStreak(bounds, false);
   }
 
   /* 雨滴断续下滑：附着时吸水变大，滑动时把水留在轨迹上变小；
@@ -1163,8 +1221,8 @@ function updateRain(dt) {
     f.age += dt;
     var flutter = 0.82 + 0.30 * (Math.sin(f.age * 2.2 + f.phase) * 0.5 + 0.5);
     f.y += f.vy * flutter * dt;
-    f.x += (S.wind + Math.sin(f.age * f.swaySpeed + f.phase) * f.sway) * dt;
-    if (f.y > rh + f.r * 2 || f.age > f.life || f.x < -f.r * 3 || f.x > rw + f.r * 3) snowFlakes.splice(i, 1);
+    f.x += (S.wind * rainScale + Math.sin(f.age * f.swaySpeed + f.phase) * f.sway) * dt;
+    if (f.y > bounds.y + bounds.h + f.r * 2 || f.age > f.life || f.x < bounds.x - f.r * 3 || f.x > bounds.x + bounds.w + f.r * 3) snowFlakes.splice(i, 1);
   }
 
   /* 湿轨迹缓慢淡去（约 1.6 秒时间常数） */
@@ -1175,6 +1233,7 @@ function updateRain(dt) {
   /* 水珠穹顶：遮罩本身是圆顶形，着色器据此算出弯折与高光 */
   rainHeadCtx.clearRect(0, 0, rw, rh);
   rainHeadCtx.globalCompositeOperation = 'lighter';
+  rainHeadCtx.globalAlpha = Math.min(1, S.rainAmt / 0.68);
   for (i = 0; i < rainDrops.length; i++) {
     d = rainDrops[i];
     var a = 0.60 + 0.40 * Math.min(1, d.r / 5);
@@ -1190,6 +1249,7 @@ function updateRain(dt) {
   /* 雪花：柔软失焦的亮点，失焦程度随大小变化（近大远小） */
   snowCtx.clearRect(0, 0, rw, rh);
   snowCtx.globalCompositeOperation = 'lighter';
+  snowCtx.globalAlpha = Math.min(1, S.snowAmt / 0.68);
   for (i = 0; i < snowFlakes.length; i++) {
     f = snowFlakes[i];
     var sa = 0.30 + 0.30 * f.soft + 0.18 * Math.min(1, f.r / 4);
@@ -1208,11 +1268,24 @@ function updateRain(dt) {
     snowCtx.restore();
   }
 
-  /* 合成遮罩纹理：R=雨珠 G=湿轨迹 B=雪花，A 恒为 255 保证存储精度 */
-  rainCtx.globalCompositeOperation = 'source-over';
+  // Falling rain shares the blue depth channel with snow. No extra GL sampler.
+  snowCtx.globalAlpha = Math.min(1, S.rainAmt / 0.68);
+  snowCtx.lineCap = 'round';
+  for (i = 0; i < rainStreaks.length; i++) {
+    var sr = rainStreaks[i];
+    snowCtx.strokeStyle = 'rgba(0,0,255,' + sr.alpha + ')';
+    snowCtx.lineWidth = sr.width;
+    snowCtx.beginPath(); snowCtx.moveTo(sr.x, sr.y);
+    snowCtx.lineTo(sr.x + sr.length * 0.045, sr.y - sr.length); snowCtx.stroke();
+  }
+  snowCtx.globalAlpha = 1;
+  /* R=attached rain, G=wet trails, B=falling precipitation, A=255. */
+  rainCtx.globalCompositeOperation = 'source-over'; rainCtx.globalAlpha = 1;
   rainCtx.fillStyle = '#000'; rainCtx.fillRect(0, 0, rw, rh);
   rainCtx.globalCompositeOperation = 'lighter';
+  rainCtx.globalAlpha = Math.min(1, S.rainAmt / 0.68);
   rainCtx.drawImage(rainTrailC, 0, 0);
+  rainCtx.globalAlpha = 1;
   rainCtx.drawImage(rainHeadC, 0, 0);
   rainCtx.drawImage(snowC, 0, 0);
 }
@@ -1432,7 +1505,8 @@ var FS_SRC = [
 '  bg += vec3(0.90, 0.94, 1.00) * rHead * (0.05 + 0.50 * rsp) * (1.0 - 0.50 * fog);',
 '  bg -= vec3(0.05, 0.06, 0.07) * rHead * (1.0 - rsp) * 0.30;',
 '  /* 雪花：柔和亮点，雾厚时被散射得更虚 */',
-'  bg += vec3(0.78, 0.84, 0.95) * rSnow * 0.60 * (0.55 + 0.45 * (1.0 - fog));',
+'  float snowMix = uSnowAmt / max(0.001, uSnowAmt + uRainAmt);',
+'  bg = mix(bg, mix(vec3(.48,.58,.66),vec3(.96,.98,1.0),snowMix), rSnow * mix(.72,.90,snowMix) * (1.0-.45*fog));',
 '',
 '  /* 雨雪带来的空气透视：雨中更沉更暗，雪中更亮更平 */',
 '  bg = mix(bg, bg * vec3(0.84, 0.88, 0.97) + vec3(0.015, 0.025, 0.045), uRainAmt * 0.55);',
@@ -1453,7 +1527,8 @@ var FS_SRC = [
 '  vec3 bloom = max(s2 - 0.58, vec3(0.0));',
 '  scatter += mix(bloom, vec3(dot(bloom, vec3(0.2126, 0.7152, 0.0722))), 0.65) * 0.20;',
 '  vec3 mistColor = mix(s2, scatter, 0.80);',
-'  mistColor *= 0.995 + 0.010 * hgt;',
+'  mistColor *= (0.995 + 0.010 * hgt) * (1.0 - .075*uRainAmt);',
+'  mistColor += vec3(.020,.025,.030) * uSnowAmt;',
 '  fogc = mix(fogc, mistColor, uMist);',
 '  vec3 col = mix(bg, fogc, op * 0.96);',
 '',
@@ -1695,7 +1770,7 @@ function drawCover(c2, img, w, h, focus) {
   var ap0 = MIST_WINDOWS.geometry(S.windowStyle, S.cssW, S.cssH), scale = w / S.cssW;
   var ap = { x: ap0.x*scale, y: ap0.y*scale, w: ap0.w*scale, h: ap0.h*scale };
   // Overscan allows cloud parallax without revealing the texture boundary.
-  if (S.windowStyle === 4 && !S.customImg && (S.sceneIndex === 4 || S.sceneIndex === 5)) {
+  if (S.windowStyle === 4 && !S.customImg && SCENES[S.sceneIndex].flight) {
     ap.x -= ap.w*.12; ap.y -= ap.h*.12; ap.w *= 1.24; ap.h *= 1.24;
   }
   var s = Math.max(ap.w / iw, ap.h / ih);
@@ -1710,22 +1785,21 @@ function buildBackground() {
   if (S.cssW < 2 || S.cssH < 2) return;
   var tw = Math.max(8, Math.min(Math.round(S.cssW * S.dpr), 2000));
   var th = Math.max(8, Math.round(tw * S.cssH / S.cssW));
-  var credit=document.getElementById('photoCredit');
-  credit.innerHTML=!S.customImg&&SCENES[S.sceneIndex].credit?'<a href="https://commons.wikimedia.org/wiki/File:Warm_street_lights_glow_along_a_narrow_city_street_filled_with_parked_cars_on_a_rainy_night.jpg" target="_blank" rel="noopener noreferrer">Nenad Stojković</a> · <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank" rel="noopener noreferrer">CC BY 2.0</a> · 色彩调整':'';
   var source;
   if (S.customImg) {
     source = mkCanvas(tw, th);
     drawCover(source.getContext('2d'), S.customImg, tw, th);
   } else {
     var Sc = SCENES[S.sceneIndex];
-    if (Sc.image) {
+    if (Sc.image || Sc.preview) {
       source = mkCanvas(tw, th);
       var photoCtx = source.getContext('2d');
       if (hasFilter(photoCtx)) photoCtx.filter = 'saturate(' + Sc.saturation + ') contrast(0.94)';
-      drawCover(photoCtx, Sc.image, tw, th, Sc.focus);
+      drawCover(photoCtx, Sc.image || Sc.preview, tw, th, Sc.focus);
       photoCtx.filter = 'none';
     } else if (Sc.failed) source = Sc.make(tw, th, Sc.seed);
     else {
+      if (BG.sharp) return;
       source = mkCanvas(tw, th);
       source.getContext('2d').fillStyle = '#17232b';
       source.getContext('2d').fillRect(0, 0, tw, th);
@@ -1824,7 +1898,7 @@ function renderGL(t) {
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-function flightScene() { return S.windowStyle === 4 && !S.customImg && (S.sceneIndex === 4 || S.sceneIndex === 5); }
+function flightScene() { return S.windowStyle === 4 && !S.customImg && SCENES[S.sceneIndex].flight; }
 function drawFlatBackground(ctx,img,t,W,H) {
   var offset=flightScene()&&!MIST_WINDOWS.state().reduced?Math.sin(t*.028)*.035*aperture.w*S.dpr:0;
   ctx.drawImage(img,offset,0,W,H);
@@ -1869,13 +1943,22 @@ function renderFlat(t) {
     var sfl = snowFlakes[i];
     softGlow(c2, sfl.x / Math.max(1, rw) * W, sfl.y / Math.max(1, rh) * H,
              Math.max(1.5, sfl.r / Math.max(1, rw) * W * 1.4),
-             '226,236,252', 0.20 + 0.25 * Math.min(1, sfl.r / 4));
+             '226,236,252', (0.20 + 0.25 * Math.min(1, sfl.r / 4)) * Math.min(1, S.snowAmt / 0.68));
   }
   for (i = 0; i < rainDrops.length; i++) {
     var rdr = rainDrops[i];
     softGlow(c2, rdr.x / Math.max(1, rw) * W, rdr.y / Math.max(1, rh) * H,
-             Math.max(1.2, rdr.r / Math.max(1, rw) * W * 0.9), '210,228,250', 0.28);
+             Math.max(1.2, rdr.r / Math.max(1, rw) * W * 0.9), '210,228,250', 0.28 * Math.min(1, S.rainAmt / 0.68));
   }
+  c2.save();
+  c2.globalAlpha = Math.min(1, S.rainAmt / 0.68);
+  for (i = 0; i < rainStreaks.length; i++) {
+    var rs = rainStreaks[i], rx = W / rw, ry = H / rh;
+    c2.strokeStyle = 'rgba(135,161,177,' + rs.alpha + ')'; c2.lineWidth = Math.max(0.5, rs.width * rx);
+    c2.beginPath(); c2.moveTo(rs.x * rx, rs.y * ry);
+    c2.lineTo((rs.x + rs.length * .045) * rx, (rs.y - rs.length) * ry); c2.stroke();
+  }
+  c2.restore();
   /* 降级模式下的水珠 */
   for (var i = 0; i < drops.length; i++) {
     var d = drops[i];
@@ -2070,13 +2153,7 @@ function fakePointerDown(cx, cy) {
     S.lastX = nx; S.lastY = ny; S.downX = nx; S.downY = ny;
     S.lastPointer.x = nx; S.lastPointer.y = ny; S.lastPointer.t = S.time;
     strokeDist = 0;
-    /* 双击 / 双触：随机换天气（单击仍是写字） */
-    var nowMs = Date.now ? Date.now() : 0;
-    var tdx = (nx - S.lastTapX) * S.cssW, tdy = (ny - S.lastTapY) * S.cssH;
-    if (S.lastTapT && nowMs - S.lastTapT < 320 && (tdx * tdx + tdy * tdy) < 1600) {
-      randomWeather();
-      S.lastTapT = 0;
-    } else { S.lastTapT = nowMs; S.lastTapX = nx; S.lastTapY = ny; }
+    S.tapStarted = Date.now(); S.tapMoved = false;
     hideHint();
     /* 落点立即擦一笔，写字手感更直接 */
     if (fogF) stampWipe(nx * dw, ny * dh, brushRadius() * densityScale);
@@ -2087,6 +2164,7 @@ function fakePointerDown(cx, cy) {
 
 function fakePointerMove(cx, cy) {
   if (!S.down) return;
+  if (Math.abs(cx / S.cssW - S.downX) * S.cssW > 8 || Math.abs(cy / S.cssH - S.downY) * S.cssH > 8) S.tapMoved = true;
   if (!MIST_WINDOWS.contains(aperture, cx, cy)) {
     S.mode = "wipe"; S.lastX = cx / S.cssW; S.lastY = cy / S.cssH; S.lastMoveT = S.time;
     return;
@@ -2121,16 +2199,23 @@ function fakePointerMove(cx, cy) {
   }
 }
 
-function fakePointerUp() {
+function fakePointerUp(cancelled) {
   if (!S.down) return;
   S.down = false;
+  var nowMs = Date.now(), nx = S.downX, ny = S.downY;
+  if (!cancelled && !S.tapMoved && nowMs - S.tapStarted < 250) {
+    var dx = (nx - S.lastTapX) * S.cssW, dy = (ny - S.lastTapY) * S.cssH;
+    if (S.lastTapT && nowMs - S.lastTapT < 320 && dx * dx + dy * dy < 1600) {
+      randomWeather(); S.lastTapT = 0;
+    } else { S.lastTapT = nowMs; S.lastTapX = nx; S.lastTapY = ny; }
+  } else S.lastTapT = 0;
   if (S.mode === 'hold') S.mode = 'wipe';
 }
 
 function targetInDock(target) {
   var el = target;
   while (el && el !== document) {
-    if (el.id === 'photoCredit' || el.id === 'shadeHandle' || el.id === 'dock' || el.id === 'melt' || el.id === 'btnMic' || el.id === 'btnScene' ||
+    if (el.id === 'photoPicker' || el.id === 'shadeHandle' || el.id === 'dock' || el.id === 'melt' || el.id === 'btnMic' || el.id === 'btnScene' ||
         el.id === 'btnWeather' || el.id === 'btnWindow' || el.id === 'btnUpload') return true;
     el = el.parentNode;
   }
@@ -2172,7 +2257,7 @@ function bindInput() {
     function up(e) {
       if (e && S.pointerId !== null && e.pointerId !== S.pointerId) return;
       S.pointerId = null;
-      fakePointerUp();
+      fakePointerUp(e && e.type !== 'pointerup');
     }
     stage.addEventListener('pointerup', up, false);
     stage.addEventListener('pointercancel', up, false);
@@ -2196,7 +2281,7 @@ function bindInput() {
       if (e.preventDefault) e.preventDefault();
     }, { passive: false });
     stage.addEventListener('touchend', function () { S.pointerId = null; fakePointerUp(); }, false);
-    stage.addEventListener('touchcancel', function () { S.pointerId = null; fakePointerUp(); }, false);
+    stage.addEventListener('touchcancel', function () { S.pointerId = null; fakePointerUp(true); }, false);
 
     stage.addEventListener('mousedown', function (e) {
       if (e.button) return;
@@ -2219,6 +2304,7 @@ function bindInput() {
 function bindKeys() {
   window.addEventListener('keydown', function (e) {
     var k = e.key || e.code;
+    if (!document.getElementById('photoPicker').hidden) return;
     var isSpace = (k === ' ' || k === 'Spacebar' || k === 'Space');
     if (isSpace) {
       var tag = e.target && e.target.tagName;
@@ -2240,7 +2326,7 @@ function bindKeys() {
   window.addEventListener('blur', function () {
     S.space = false;
     S.pointerId = null;
-    fakePointerUp();
+    fakePointerUp(true);
   }, false);
 }
 
@@ -2263,25 +2349,69 @@ function showLabel(msg) {
   labelTimer = setTimeout(function () { labelEl.style.opacity = '0'; }, 1600);
 }
 
-function nextScene() {
-  S.sceneIndex = (S.sceneIndex + 1) % SCENES.length;
+function selectScene(index) {
+  S.sceneIndex = index;
   S.customImg = null;
-  loadScene(S.sceneIndex);
+  loadScene(index);
   buildBackground();
-  showLabel(SCENES[S.sceneIndex].name);
+  showLabel(('0' + (index + 1)).slice(-2) + ' · ' + SCENES[index].name);
+  hideHint();
+}
+function nextScene() { selectScene((S.sceneIndex + 1) % SCENES.length); }
+
+function bindPhotoPicker() {
+  var picker = document.getElementById('photoPicker');
+  var grid = document.getElementById('photoGrid');
+  var close = document.getElementById('closePhotos');
+  var buttons = [], populated = false;
+  function dismiss() {
+    picker.hidden = true; document.body.classList.remove('choosing-photo'); btnScene.setAttribute('aria-expanded', 'false'); btnScene.focus();
+  }
+  function open() {
+    if (!populated) {
+      SCENES.forEach(function (scene, index) {
+        var button = document.createElement('button');
+        var img = new Image();
+        button.type = 'button'; button.className = 'photo-option';
+        var number = ('0' + (index + 1)).slice(-2);
+        button.setAttribute('aria-label', number + ' · ' + scene.name);
+        img.alt = ''; img.width = 120; img.height = 150;
+        img.onload = function () { scene.preview = img; };
+        img.src = scene.thumb;
+        var caption = document.createElement('span');
+        caption.textContent = number + ' · ' + scene.name;
+        button.appendChild(img); button.appendChild(caption);
+        button.addEventListener('click', function () { selectScene(index); dismiss(); });
+        grid.appendChild(button); buttons.push(button);
+      });
+      populated = true;
+    }
+    buttons.forEach(function (button, i) { button.setAttribute('aria-pressed', !S.customImg && i === S.sceneIndex ? 'true' : 'false'); });
+    S.space = false; fakePointerUp(true); hideHint();
+    picker.hidden = false; document.body.classList.add('choosing-photo'); btnScene.setAttribute('aria-expanded', 'true');
+    buttons[S.sceneIndex].focus();
+  }
+  close.addEventListener('click', dismiss);
+  picker.addEventListener('click', function (e) { if (e.target === picker) dismiss(); });
+  picker.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { e.preventDefault(); dismiss(); }
+    if (e.key === 'Tab') {
+      var first = close, last = buttons[buttons.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+  btnScene.addEventListener('click', open);
 }
 
-var WINDOW_NAMES = ['无框玻璃', '车窗', '火车窗', '渡轮方窗', '飞机舷窗'];
 function nextWindow() {
-  S.windowStyle = (S.windowStyle + 1) % WINDOW_NAMES.length;
-  fakePointerUp();
-  if (!S.customImg) {
-    S.sceneIndex = WINDOW_SCENES[S.windowStyle];
-    loadScene(S.sceneIndex);
-  }
+  S.windowStyle = S.windowStyle === 4 ? 2 : 4;
+  fakePointerUp(true);
   syncFrame();
+  setupRain();
+  primeWeather(S.weather);
   buildBackground();
-  showLabel(WINDOW_NAMES[S.windowStyle]);
+  showLabel(S.windowStyle === 4 ? '飞机舷窗' : '火车窗');
 }
 
 var uiTick = 0, lastUiLevel = -1;
@@ -2309,6 +2439,7 @@ if (debugMode) window.__mist = {
     function avg(a) { var sum = 0; for (var i = 0; i < a.length; i++) sum += a[i]; return sum / Math.max(1, a.length); }
     var centre = ((dh * 0.48) | 0) * dw + ((dw * 0.5) | 0);
     return { gl: useGL, scene: S.sceneIndex, photoReady: !!SCENES[S.sceneIndex].image,
+      rain: rainDrops.length, rainStreaks: rainStreaks.length, snow: snowFlakes.length, rainAmt: S.rainAmt, snowAmt: S.snowAmt,
       custom: !!S.customImg, windowStyle: S.windowStyle, melt: S.melt, weather: S.weather,
       fps: 1000 / Math.max(1, avg(qaFrames)), cpuMs: avg(qaCpu), frames: qaTicks,
       mic: S.micLevel, breath: S.breathLevel, fog: fogSum / Math.max(1, flen),
@@ -2427,7 +2558,8 @@ function bindDom() {
 
 function bindButtons() {
   btnMic.addEventListener('click', function () { toggleMic(); if (this.blur) this.blur(); }, false);
-  btnScene.addEventListener('click', function () { nextScene(); if (this.blur) this.blur(); }, false);
+  bindPhotoPicker();
+  updateWeatherButton();
   btnWeather.addEventListener('click', function () { randomWeather(); if (this.blur) this.blur(); }, false);
   btnWindow.addEventListener('click', function () { nextWindow(); if (this.blur) this.blur(); }, false);
   for (var mi = 0; mi < meltSegs.length; mi++) {
