@@ -29,7 +29,7 @@ npm run build
 
 无运行依赖和外部 CDN，`dist/` 可以直接部署到静态托管。渲染采用 WebGL1，失败时使用简化 Canvas2D 效果。浏览器脚本以 Chrome 61 的语法和 API 为目标；旧内核和手机真机仍需实测。
 
-默认是优化质感；在地址后加 `?look=original` 可对照原雾气质感。加 `?window=1` 至 `4` 直接查看四种模拟窗型，`?scene=0` 至 `7` 直接选背景。验收记录见 [docs/QA.md](docs/QA.md)。
+默认是更柔和、遮盖力更强的雾层；水滴与融化的模拟参数保持不变。`?look=previous` 可对照上一版雾层。在地址后加 `?look=original` 可对照原雾气质感。加 `?window=1` 至 `4` 直接查看四种模拟窗型，`?scene=0` 至 `7` 直接选背景。验收记录见 [docs/QA.md](docs/QA.md)。
 
 ## 素材与版权
 

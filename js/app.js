@@ -612,6 +612,7 @@ var SCENES = [
 ];
 var WINDOW_SCENES = [0, 6, 1, 3, 4];
 var originalLook = /(?:[?&])look=original(?:&|$)/.test(location.search);
+var softMist = !originalLook && !/(?:[?&])look=previous(?:&|$)/.test(location.search);
 var debugMode = /(?:[?&])debug(?:[=&]|$)/.test(location.search);
 var sceneMatch = location.search.match(/[?&]scene=([0-7])(?:&|$)/);
 var windowMatch = location.search.match(/[?&]window=([0-4])(?:&|$)/);
@@ -1306,6 +1307,7 @@ var FS_SRC = [
 'uniform vec2 uBuf;',
 'uniform float uTime;',
 'uniform float uPolish;',
+'uniform float uMist;',
 'uniform float uFlight;',
 'uniform float uCloudTime;',
 'uniform vec4 uAperture;',
@@ -1406,6 +1408,9 @@ var FS_SRC = [
 '  float clarity = 1.0 - 0.22 * macro;',
 '  float b1 = smoothstep(0.04, 0.5, d * clarity);',
 '  float b2 = smoothstep(0.30, 0.95, d * clarity);',
+'  // Dense condensation scatters detail earlier; the simulation density is unchanged.',
+'  b1 = mix(b1, smoothstep(0.025, 0.32, d), uMist);',
+'  b2 = mix(b2, smoothstep(0.10, 0.68, d), uMist);',
 '  float corner = smoothstep(0.28, 0.85, length(uv - 0.5));',
 '  b2 = clamp(b2 + corner * 0.20, 0.0, 1.0);',
 '',
@@ -1441,6 +1446,15 @@ var FS_SRC = [
 '  float sceneLight = dot(s2, vec3(0.2126, 0.7152, 0.0722));',
 '  vec3 photoFog = bg * 0.46 + uFogTint * (0.16 + 0.16 * sceneLight);',
 '  fogc = mix(fogc, photoFog, uPolish * 0.55);',
+'  // Soft room light and a broad scene glow, inspired by the earlier renderer.',
+'  // Scattering follows local density; it disappears completely in a wiped stroke.',
+'  vec3 scatterTint = mix(uFogTint, vec3(0.94), 0.60);',
+'  vec3 scatter = scatterTint * (0.39 + 0.46 * sceneLight);',
+'  vec3 bloom = max(s2 - 0.58, vec3(0.0));',
+'  scatter += mix(bloom, vec3(dot(bloom, vec3(0.2126, 0.7152, 0.0722))), 0.65) * 0.20;',
+'  vec3 mistColor = mix(s2, scatter, 0.80);',
+'  mistColor *= 0.995 + 0.010 * hgt;',
+'  fogc = mix(fogc, mistColor, uMist);',
 '  vec3 col = mix(bg, fogc, op * 0.96);',
 '',
 '  /* 水膜：密度极高处微珠并成连续水膜，更透更亮泽 */',
@@ -1459,14 +1473,24 @@ var FS_SRC = [
 '  vec2 ldir = normalize(vec2(-0.5, -0.86));',
 '  float sp = pow(max(0.0, dot(normalize(gn + vec2(0.0001)), ldir)), 7.0);',
 '  float beads = smoothstep(0.68, 0.98, hgt) * d;',
-'  col += vec3(0.85, 0.90, 1.00) * beads * (0.02 + 0.30 * sp) * (0.70 + 0.30 * macro);',
-'  col -= vec3(0.05, 0.06, 0.075) * (1.0 - smoothstep(0.08, 0.45, hgt)) * d * 0.32;',
+'  col += vec3(0.85, 0.90, 1.00) * beads * (0.02 + 0.30 * sp) * (0.70 + 0.30 * macro) * mix(1.0, 0.35, uMist);',
+'  col -= vec3(0.05, 0.06, 0.075) * (1.0 - smoothstep(0.08, 0.45, hgt)) * d * 0.32 * mix(1.0, 0.20, uMist);',
 '',
 '  /* 局部略粗的水珠：很轻的亮心与暗缘 */',
 '  float bigBead = smoothstep(0.68, 0.95, macro) * d;',
 '  float sp2 = pow(max(0.0, dot(normalize(gn2 + vec2(0.0001)), ldir)), 6.0);',
-'  col += vec3(0.80, 0.86, 0.97) * bigBead * (0.03 + 0.16 * sp2);',
-'  col -= vec3(0.04, 0.05, 0.065) * smoothstep(0.30, 0.72, hgt) * bigBead * 0.28;',
+'  col += vec3(0.80, 0.86, 0.97) * bigBead * (0.03 + 0.16 * sp2) * mix(1.0, 0.30, uMist);',
+'  col -= vec3(0.04, 0.05, 0.065) * smoothstep(0.30, 0.72, hgt) * bigBead * 0.28 * mix(1.0, 0.18, uMist);',
+'',
+'  // Subpixel condensation beads exist only where there is mist, never as permanent dirt.',
+'  vec2 microP = uv * uBuf / 3.2;',
+'  vec2 microCell = floor(microP);',
+'  vec2 microOffset = vec2(hash21(microCell), hash21(microCell + 37.1));',
+'  vec2 microLocal = fract(microP) - (0.35 + microOffset * 0.30);',
+'  float microR = 0.10 + 0.16 * clamp(d, 0.0, 1.0);',
+'  float microLens = 1.0 - smoothstep(microR * 0.45, microR, length(microLocal));',
+'  float microShine = 1.0 - smoothstep(0.0, microR * 0.65, length(microLocal + vec2(microR * 0.24)));',
+'  col += (microShine * 0.036 - microLens * 0.006) * smoothstep(0.04, 0.55, d) * uMist;',
 '',
 '  /* 水珠：透镜内折射 + 球面高光 */',
 '  float dsp = pow(max(0.0, dot(normalize(dg + vec2(0.0001)), ldir)), 5.0);',
@@ -1482,13 +1506,13 @@ var FS_SRC = [
 '',
 '  /* 2) 中空双层玻璃：亮部带一道轻微错位的重影 */',
 '  vec3 ghost = texture2D(uBg0, buv + vec2(0.007, -0.005)).rgb;',
-'  col += ghost * smoothstep(0.22, 0.85, dot(ghost, vec3(0.33))) * 0.050;',
+'  col += ghost * smoothstep(0.22, 0.85, dot(ghost, vec3(0.33))) * 0.050 * mix(1.0, 1.0 - smoothstep(0.03, 0.35, d), uMist);',
 '',
 '  /* 3) 表面灰迹 / 擦拭弧痕 / 灰尘：擦开雾气后依然存在的那层脏 */',
 '  float smudge = gsv.r;',
-'  col = mix(col, col * vec3(0.93, 0.95, 1.00) + vec3(0.020, 0.024, 0.030), smudge * mix(0.60, 0.30, uPolish));',
-'  col += vec3(0.62, 0.74, 0.90) * gsv.g * 0.055;',
-'  col += vec3(0.75, 0.82, 0.95) * gsv.b * 0.12;',
+'  col = mix(col, col * vec3(0.93, 0.95, 1.00) + vec3(0.020, 0.024, 0.030), smudge * mix(0.60, 0.30, uPolish) * (1.0 - uMist));',
+'  col += vec3(0.62, 0.74, 0.90) * gsv.g * 0.055 * (1.0 - uMist);',
+'  col += vec3(0.75, 0.82, 0.95) * gsv.b * 0.12 * (1.0 - uMist);',
 '',
 '  /* 4) 窗框内侧：边缘压暗 + 一道接光内倒角，读作真实窗格 */',
 '  vec2 qq = abs(uv - 0.5) * 2.0;',
@@ -1499,11 +1523,11 @@ var FS_SRC = [
 '',
 '  /* 5) 冷边凝结：靠窗框处水汽更厚、微珠更亮 */',
 '  float nearFrame = smoothstep(0.60, 0.95, outer);',
-'  col += vec3(0.80, 0.87, 1.00) * beads * nearFrame * 0.060;',
+'  col += vec3(0.80, 0.87, 1.00) * beads * nearFrame * 0.060 * mix(1.0, 0.35, uMist);',
 '',
 '  /* 胶片颗粒 + 暗角 + 轻微反差 */',
 '  float fn = hash21(uv * uBuf + vec2(fract(uTime * 17.0), fract(uTime * 9.0)) * 97.0) - 0.5;',
-'  col += fn * mix(0.020, 0.012, uPolish);',
+'  col += fn * mix(0.020, 0.012, uPolish) * mix(1.0, 0.25, uMist);',
 '',
 '  float vig = 1.0 - smoothstep(0.42, 1.30, length((uv - vec2(0.5, 0.47)) * vec2(1.02, 1.0) * 1.6));',
 '  col *= mix(mix(0.52, 0.65, uPolish), 1.0, vig);',
@@ -1622,6 +1646,7 @@ function initGL() {
     buf: gl.getUniformLocation(prog, 'uBuf'),
     time: gl.getUniformLocation(prog, 'uTime'),
     polish: gl.getUniformLocation(prog, 'uPolish'),
+    mist: gl.getUniformLocation(prog, 'uMist'),
     flight: gl.getUniformLocation(prog, 'uFlight'),
     cloudTime: gl.getUniformLocation(prog, 'uCloudTime'),
     aperture: gl.getUniformLocation(prog, 'uAperture'),
@@ -1715,7 +1740,7 @@ function buildBackground() {
   var bA = mkCanvas(aw, ah), ac = bA.getContext('2d');
   ac.imageSmoothingEnabled = true;
   if (hasFilter(ac)) {
-    ac.filter = 'blur(' + Math.max(1.5, Math.min(aw, ah) * 0.018) + 'px)';
+    ac.filter = 'blur(' + Math.max(1.5, Math.min(aw, ah) * (softMist ? 0.024 : 0.018)) + 'px)';
     ac.drawImage(sharp, 0, 0, aw, ah);
     ac.filter = 'none';
   } else ac.drawImage(sharp, 0, 0, aw, ah);
@@ -1724,7 +1749,7 @@ function buildBackground() {
   var bB = mkCanvas(bw, bh), bc = bB.getContext('2d');
   bc.imageSmoothingEnabled = true;
   if (hasFilter(bc)) {
-    bc.filter = 'blur(' + Math.max(1.0, Math.min(bw, bh) * 0.05) + 'px)';
+    bc.filter = 'blur(' + Math.max(1.0, Math.min(bw, bh) * (softMist ? 0.085 : 0.05)) + 'px)';
     bc.drawImage(sharp, 0, 0, bw, bh);
     bc.filter = 'none';
   } else bc.drawImage(sharp, 0, 0, bw, bh);
@@ -1794,6 +1819,7 @@ function renderGL(t) {
   gl.uniform1f(U.cloudTime, MIST_WINDOWS.state().reduced ? 0 : t);
   gl.uniform4f(U.aperture, aperture.x/S.cssW, aperture.y/S.cssH, aperture.w/S.cssW, aperture.h/S.cssH);
   gl.uniform1f(U.polish, originalLook ? 0 : 1);
+  gl.uniform1f(U.mist, softMist ? 1 : 0);
   gl.uniform3fv(U.fogTint, S.customImg ? [0.90, 0.91, 0.91] : SCENES[S.sceneIndex].tint);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
@@ -1820,6 +1846,11 @@ function renderFlat(t) {
     tmpCtx.globalAlpha = 1;
     tmpCtx.clearRect(0, 0, W, H);
     drawFlatBackground(tmpCtx, BG.blurB, t, W, H);
+    if (softMist) {
+      var tint = S.customImg ? [0.90, 0.91, 0.91] : SCENES[S.sceneIndex].tint;
+      tmpCtx.fillStyle = 'rgba(' + Math.round(tint[0]*196) + ',' + Math.round(tint[1]*196) + ',' + Math.round(tint[2]*196) + ',0.40)';
+      tmpCtx.fillRect(0, 0, W, H);
+    }
     tmpCtx.globalCompositeOperation = 'destination-in';
     tmpCtx.drawImage(fogCanvas, 0, 0, W, H);
     tmpCtx.globalCompositeOperation = 'source-over';
@@ -1829,7 +1860,7 @@ function renderFlat(t) {
   if (BG.glass) {
     c2.save();
     c2.globalCompositeOperation = 'lighter';
-    c2.globalAlpha = 0.35;
+    c2.globalAlpha = softMist ? 0 : 0.35;
     c2.drawImage(BG.glass, 0, 0, W, H);
     c2.restore();
   }
@@ -2283,7 +2314,7 @@ if (debugMode) window.__mist = {
       mic: S.micLevel, breath: S.breathLevel, fog: fogSum / Math.max(1, flen),
       centerFog: fogF ? fogF[centre] : 0, grid: [dw, dh], dpr: S.dpr, drops: drops.length,
       aperture: aperture ? [aperture.x, aperture.y, aperture.w, aperture.h] : null,
-      shade: MIST_WINDOWS.state(), flight: flightScene(), samplers: useGL ? 7 : 0, error: window.__dbgErr, look: originalLook ? 'original' : 'polished' };
+      shade: MIST_WINDOWS.state(), flight: flightScene(), samplers: useGL ? 7 : 0, error: window.__dbgErr, look: originalLook ? 'original' : softMist ? 'soft-mist' : 'previous' };
   }
 };
 
