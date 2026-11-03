@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#04070c">
 <title>哈气 · Mistpane</title>
-<meta name="description" content="对着冬天的窗哈一口气，用手指在水雾上写字。四张旅行照片，雨雪、车窗与飞机舷窗。">
+<meta name="description" content="对着冬天的窗哈一口气，用手指在水雾上写字。六张安静的风景，雨雪、车窗、火车窗、渡轮窗与飞机舷窗。">
 <link rel="icon" href="data:,">
-<link rel="preload" href="assets/photos/snow-cabin.jpg" as="image">
+<link rel="preload" href="assets/photos/fog-house.jpg" as="image">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -15,6 +15,7 @@
 <div id="stage">
   <canvas id="glass" role="img" aria-label="结雾的玻璃窗，可以用手指擦开"></canvas>
   <canvas id="flat" hidden role="img" aria-label="结雾的玻璃窗，可以用手指擦开"></canvas>
+  <canvas id="windowFrame" aria-hidden="true"></canvas>
   <div id="hint" aria-hidden="true">呼气，让玻璃起雾<b>按住画面 / 空格呼气 · 手指在雾上写字画画</b><b>底部按钮更换背景、随机天气 · 双击画面也可换天气</b></div>
   <div id="label" aria-hidden="true"></div>
   <div id="melt" role="group" aria-label="雾气消散速度">
@@ -51,7 +52,7 @@
       <path d="M16 21.6l-.9 1.9"></path>
     </svg>
   </button>
-  <button type="button" class="btn" id="btnWindow" aria-label="切换窗户样式" title="切换窗户：车窗 / 火车窗 / 飞机舷窗">
+  <button type="button" class="btn" id="btnWindow" aria-label="切换窗户样式" title="切换窗户：车窗 / 火车窗 / 渡轮方窗 / 飞机舷窗">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <rect x="3.5" y="5" width="17" height="14" rx="2.5"></rect>
       <rect x="6.8" y="8.2" width="10.4" height="7.6" rx="1.6"></rect>
@@ -68,6 +69,7 @@
 
 <input type="file" id="file" accept="image/*" tabindex="-1" aria-hidden="true">
 
+<script src="js/windows.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

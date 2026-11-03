@@ -2,9 +2,11 @@
 
 ## 照片
 
-`assets/photos/` 中的四张旅行照片由项目创建者提供，仅授权在本项目中展示，不适用代码的 MIT 许可证。另作他用请先取得权利人的许可。
+`assets/photos/` 中除 `fog-house.jpg` 外的五张旅行照片由项目创建者提供，仅授权在本项目中展示，不适用代码的 MIT 许可证。另作他用请先取得权利人的许可。
 
-发布文件已转正方向、缩放至最长边 2048px、重新编码；不携带 EXIF、GPS 或原文件名。
+`fog-house.jpg`：Lukas Neasi，[A house in winter fog](https://commons.wikimedia.org/wiki/File:A_house_in_winter_fog_(Unsplash).jpg)，CC0。照片色彩在浏览器渲染时作了低饱和度处理。
+
+个人照片发布文件已转正方向、缩放至最长边 2048px、重新编码；不携带 EXIF、GPS 或原文件名。两张云层照片从原始舷窗照片内裁取，去掉原照片的实物窗框。
 
 ## 代码与参考
 

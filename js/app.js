@@ -601,14 +601,18 @@ function sceneBokeh(w, h, seed) {
 
 // Photos are local, metadata-free exports. Focus points keep the subject in a landscape crop.
 var SCENES = [
-  { name: '雪地里，一盏暖灯', file: 'assets/photos/snow-cabin.jpg', focus: [0.57, 0.68], tint: [0.83, 0.89, 0.93], make: scenePines, seed: 90210 },
-  { name: '雨夜，咖啡馆还亮着', file: 'assets/photos/rain-cafe.jpg', focus: [0.53, 0.54], tint: [0.95, 0.89, 0.79], make: sceneBokeh, seed: 77112 },
-  { name: '海边的红屋', file: 'assets/photos/coast.jpg', focus: [0.52, 0.51], tint: [0.85, 0.90, 0.92], make: scenePines, seed: 90210 },
-  { name: '天黑以前的街巷', file: 'assets/photos/blue-hour.jpg', focus: [0.52, 0.48], tint: [0.90, 0.88, 0.83], make: sceneStreet, seed: 20260211 }
+  { name: '雾林里，一间小屋', file: 'assets/photos/fog-house.jpg', focus: [0.43, 0.57], tint: [0.86, 0.90, 0.91], saturation: 0.58, make: scenePines, seed: 90210 },
+  { name: '雪谷，天还没暗', file: 'assets/photos/winter-valley.jpg', focus: [0.51, 0.51], tint: [0.89, 0.91, 0.89], saturation: 0.48, make: scenePines, seed: 90210 },
+  { name: '雪地里，一盏暖灯', file: 'assets/photos/snow-cabin.jpg', focus: [0.57, 0.68], tint: [0.86, 0.90, 0.92], saturation: 0.52, make: scenePines, seed: 90210 },
+  { name: '冷海边的红屋', file: 'assets/photos/coast.jpg', focus: [0.52, 0.46], tint: [0.86, 0.90, 0.91], saturation: 0.46, make: scenePines, seed: 90210 },
+  { name: '云海之上', file: 'assets/photos/cloud-sea.jpg', focus: [0.50, 0.45], tint: [0.88, 0.92, 0.96], saturation: 0.65, make: scenePines, seed: 90210 },
+  { name: '日落，云层安静下来', file: 'assets/photos/cloud-dusk.jpg', focus: [0.52, 0.48], tint: [0.93, 0.89, 0.83], saturation: 0.55, make: sceneBokeh, seed: 77112 }
 ];
+var WINDOW_SCENES = [0, 2, 1, 3, 4];
 var originalLook = /(?:[?&])look=original(?:&|$)/.test(location.search);
 var debugMode = /(?:[?&])debug(?:[=&]|$)/.test(location.search);
-var sceneMatch = location.search.match(/[?&]scene=([0-3])/);
+var sceneMatch = location.search.match(/[?&]scene=([0-5])(?:&|$)/);
+var windowMatch = location.search.match(/[?&]window=([0-4])(?:&|$)/);
 
 function loadScene(index) {
   var scene = SCENES[index];
@@ -632,7 +636,7 @@ function loadScene(index) {
 /* ------------------------------------------------------------------ 全局状态 */
 var S = {
   cssW: 0, cssH: 0, dpr: 1, bufW: 1, bufH: 1,
-  sceneIndex: sceneMatch ? Number(sceneMatch[1]) : 0, customImg: null,
+  sceneIndex: sceneMatch ? Number(sceneMatch[1]) : WINDOW_SCENES[windowMatch ? Number(windowMatch[1]) : 0], customImg: null,
   micOn: false, micLevel: 0, micEnv: 0,
   micDriftX: 0, micDriftY: 0, micDriftT: 0, micDriftA: 0,
   holdLevel: 0, holdX: 0, holdY: 0,
@@ -642,7 +646,7 @@ var S = {
   pointerType: 'mouse', pointerId: null,
   down: false, mode: 'wipe', downT: 0, lastMoveT: 0,
   lastX: 0.5, lastY: 0.47, downX: 0.5, downY: 0.47,
-  windowStyle: 0,
+  windowStyle: windowMatch ? Number(windowMatch[1]) : 0,
   rainAmt: 0, snowAmt: 0, melt: 1,
   weather: 'rain', weatherLevel: 0.6, weatherHold: 0,
   wind: 0, windTarget: 0, windT: 0,
@@ -650,6 +654,7 @@ var S = {
   time: 0
 };
 
+var frameCanvas, aperture = null;
 var stage, glass, flat, flatCtx, hintEl, labelEl, toastEl,
     btnMic, btnScene, btnWeather, btnWindow, btnUpload, fileEl;
 var useGL = false, gl = null, prog = null, U = null;
@@ -1300,7 +1305,6 @@ var FS_SRC = [
 'uniform float uTime;',
 'uniform float uPolish;',
 'uniform vec3 uFogTint;',
-'uniform float uWindow;',
 'uniform float uRainAmt;',
 'uniform float uSnowAmt;',
 'const float GE = 0.004;',
@@ -1318,42 +1322,6 @@ var FS_SRC = [
 '}',
 'void main() {',
 '  vec2 uv = vUv;',
-'',
-'  /* ---- 窗户型状：普通 / 车窗 / 火车窗 / 飞机舷窗 ---- */',
-'  float asp = uBuf.x / max(1.0, uBuf.y);',
-'  vec2 wp = (uv - 0.5) * vec2(asp, 1.0);',
-'  float sd = -0.5;',
-'  float inWin = 1.0;',
-'  vec3 frameCol = vec3(0.0);',
-'  if (uWindow > 0.5) {',
-'    vec2 hb; float rad2;',
-'    if (uWindow < 1.5) { hb = vec2(0.460 * asp, 0.355); rad2 = 0.055; }     /* 车窗 */',
-'    else if (uWindow < 2.5) { hb = vec2(0.440 * asp, 0.375); rad2 = 0.105; }  /* 火车窗 */',
-'    else { hb = vec2(min(0.255, 0.460 * asp), 0.340); rad2 = 0.210; }         /* 飞机舷窗 */',
-'    rad2 = min(rad2, min(hb.x, hb.y) * 0.95);',
-'    vec2 qb = abs(wp) - hb + rad2;',
-'    sd = min(max(qb.x, qb.y), 0.0) + length(max(qb, vec2(0.0))) - rad2;',
-'    inWin = 1.0 - smoothstep(-0.002, 0.002, sd);',
-'    /* 框体材质 */',
-'    if (uWindow < 1.5) {',
-'      frameCol = vec3(0.030, 0.034, 0.044) * (0.75 + 0.60 * hash21(wp * 260.0));',
-'      float seal = 1.0 - smoothstep(0.0, 0.030, sd);',
-'      frameCol += vec3(0.09, 0.10, 0.12) * seal * seal;   /* 橡胶密封圈 */',
-'    } else if (uWindow < 2.5) {',
-'      frameCol = vec3(0.070, 0.077, 0.090) * (0.80 + 0.40 * hash21(wp * 180.0));',
-'      frameCol += vec3(0.26, 0.29, 0.34) * (1.0 - smoothstep(0.0, 0.012, sd));  /* 金属内缘 */',
-'    } else {',
-'      /* 客舱壁：上亮下暗、窗周微亮，细塑料颗粒 */',
-'      float fs = smoothstep(-0.5, 0.5, wp.y);',
-'      vec3 wall = mix(vec3(0.79, 0.81, 0.84), vec3(0.50, 0.55, 0.62), fs);',
-'      wall *= 0.94 + 0.12 * (1.0 - smoothstep(0.20, 0.85, length(wp)));',
-'      wall += vec3(0.04) * hash21(wp * 320.0);',
-'      /* 紧贴玻璃的一圈深色塑料内框 */',
-'      float bez = 1.0 - smoothstep(0.0, 0.026, sd);',
-'      frameCol = mix(wall, vec3(0.30, 0.34, 0.40) * (0.88 + 0.30 * hash21(wp * 200.0)), bez * 0.75);',
-'      frameCol *= 1.0 - 0.14 * (1.0 - smoothstep(0.0, 0.06, sd));  /* 凹入阴影 */',
-'    }',
-'  }',
 '',
 '  vec4 f = texture2D(uFog, uv);',
 '  float fog = f.r;',
@@ -1396,7 +1364,6 @@ var FS_SRC = [
 '',
 '  /* 颗粒只做微扰：雾层整体均匀，细节靠细珠体现 */',
 '  float d = clamp(fog * (0.98 + 0.06 * hgt) + (hgt - 0.5) * 0.07 * smoothstep(0.05, 0.4, fog), 0.0, 1.0);',
-'  d *= inWin;   /* 雾只存在于窗玻璃范围内 */',
 '',
 '  /* 折射：雾层梯度 + 细珠微法线 + 粗珠弯折 + 水珠透镜 */',
 '  vec2 refr = clamp(fg * 0.00025, -0.010, 0.010);',
@@ -1495,45 +1462,6 @@ var FS_SRC = [
 '  col = mix(col, col * vec3(0.93, 0.95, 1.00) + vec3(0.020, 0.024, 0.030), smudge * mix(0.60, 0.30, uPolish));',
 '  col += vec3(0.62, 0.74, 0.90) * gsv.g * 0.055;',
 '  col += vec3(0.75, 0.82, 0.95) * gsv.b * 0.12;',
-'',
-'  /* ---- 车厢 / 机舱内侧的反射与前景（画在雾之上） ---- */',
-'  if (uWindow > 0.5 && uWindow < 1.5) {',
-'    /* 车内斜向反光 */',
-'    float diag = 1.0 - smoothstep(0.0, 0.06, abs((uv.x * 0.6 + uv.y * 0.8) - 0.78));',
-'    col += vec3(0.50, 0.55, 0.65) * diag * diag * 0.025;',
-'    /* 仪表台剪影与上缘一线光 */',
-'    float dashTop = 0.79 + 0.045 * cos((uv.x - 0.5) * 4.2);',
-'    float dashM = smoothstep(dashTop - 0.008, dashTop, uv.y);',
-'    col = mix(col, vec3(0.020, 0.024, 0.032), dashM);',
-'    col += vec3(0.50, 0.55, 0.62) * dashM * (1.0 - dashM) * 0.50;',
-'  }',
-'  if (uWindow > 1.5 && uWindow < 2.5) {',
-'    /* 车厢顶灯在玻璃内侧的长条反射 */',
-'    float t1 = 1.0 - smoothstep(0.0, 0.010, abs(uv.y - 0.24));',
-'    float t2 = 1.0 - smoothstep(0.0, 0.006, abs(uv.y - 0.33));',
-'    float tb = 1.0 - smoothstep(0.0, 0.15, abs(uv.y - 0.29));',
-'    col += vec3(0.72, 0.78, 0.88) * (t1 * t1 * 0.055 + t2 * t2 * 0.030 + tb * tb * 0.020);',
-'  }',
-'  if (uWindow > 2.5) {',
-'    /* 收起的遮光板：顶端渐入阴影 + 下缘一线 + 投在玻璃上的软影 */',
-'    float shade = smoothstep(0.15, 0.21, uv.y);',
-'    col *= 1.0 - 0.22 * (1.0 - shade);',
-'    float lip = 1.0 - smoothstep(0.0, 0.006, abs(uv.y - 0.205));',
-'    col += vec3(0.62, 0.67, 0.74) * lip * 0.07;',
-'    float sh2 = smoothstep(0.208, 0.225, uv.y) * (1.0 - smoothstep(0.225, 0.26, uv.y));',
-'    col -= vec3(0.05, 0.05, 0.06) * sh2 * 0.55;',
-'  }',
-'',
-'  /* ---- 窗框合成：压暗靠框玻璃 + 框玻璃接光线 ---- */',
-'  if (uWindow > 0.5) {',
-'    float nearEdge = smoothstep(-0.035, -0.004, sd);',
-'    col *= 1.0 - 0.30 * nearEdge;',
-'    float ring = exp(-sd * sd * 220000.0);',
-'    vec3 composed = mix(frameCol, col, inWin);',
-'    composed += vec3(0.50, 0.56, 0.64) * ring * 0.20;',
-'    composed += vec3(0.30, 0.40, 0.55) * smoothstep(-0.02, -0.004, sd) * inWin * 0.04;',
-'    col = composed;',
-'  }',
 '',
 '  /* 4) 窗框内侧：边缘压暗 + 一道接光内倒角，读作真实窗格 */',
 '  vec2 qq = abs(uv - 0.5) * 2.0;',
@@ -1661,7 +1589,6 @@ function initGL() {
     grain: gl.getUniformLocation(prog, 'uGrain'),
     rain: gl.getUniformLocation(prog, 'uRain'),
     rainTexel: gl.getUniformLocation(prog, 'uRainTexel'),
-    window: gl.getUniformLocation(prog, 'uWindow'),
     rainAmt: gl.getUniformLocation(prog, 'uRainAmt'),
     snowAmt: gl.getUniformLocation(prog, 'uSnowAmt'),
     texel: gl.getUniformLocation(prog, 'uTexel'),
@@ -1710,11 +1637,12 @@ function switchToFlat(msg) {
 function drawCover(c2, img, w, h, focus) {
   var iw = img.naturalWidth || img.width || 0, ih = img.naturalHeight || img.height || 0;
   if (!iw || !ih) return;
-  var s = Math.max(w / iw, h / ih);
+  var ap = MIST_WINDOWS.geometry(S.windowStyle, w, h);
+  var s = Math.max(ap.w / iw, ap.h / ih);
   var dww = iw * s, dhh = ih * s;
   var fx = focus ? focus[0] : 0.5, fy = focus ? focus[1] : 0.5;
-  var dx = clamp(w * 0.5 - dww * fx, w - dww, 0);
-  var dy = clamp(h * 0.5 - dhh * fy, h - dhh, 0);
+  var dx = clamp(ap.x + ap.w * 0.5 - dww * fx, ap.x + ap.w - dww, ap.x);
+  var dy = clamp(ap.y + ap.h * 0.5 - dhh * fy, ap.y + ap.h - dhh, ap.y);
   c2.drawImage(img, dx, dy, dww, dhh);
 }
 
@@ -1730,7 +1658,10 @@ function buildBackground() {
     var Sc = SCENES[S.sceneIndex];
     if (Sc.image) {
       source = mkCanvas(tw, th);
-      drawCover(source.getContext('2d'), Sc.image, tw, th, Sc.focus);
+      var photoCtx = source.getContext('2d');
+      if (hasFilter(photoCtx)) photoCtx.filter = 'saturate(' + Sc.saturation + ') contrast(0.94)';
+      drawCover(photoCtx, Sc.image, tw, th, Sc.focus);
+      photoCtx.filter = 'none';
     } else if (Sc.failed) source = Sc.make(tw, th, Sc.seed);
     else {
       source = mkCanvas(tw, th);
@@ -1819,7 +1750,6 @@ function renderGL(t) {
   gl.uniform2f(U.texel, 1 / Math.max(1, dw), 1 / Math.max(1, dh));
   gl.uniform2f(U.buf, S.bufW, S.bufH);
   gl.uniform2f(U.rainTexel, 1 / Math.max(1, rw), 1 / Math.max(1, rh));
-  gl.uniform1f(U.window, S.windowStyle);
   gl.uniform1f(U.rainAmt, S.rainAmt);
   gl.uniform1f(U.snowAmt, S.snowAmt);
   gl.uniform1f(U.time, t);
@@ -1869,30 +1799,6 @@ function renderFlat(t) {
     var rdr = rainDrops[i];
     softGlow(c2, rdr.x / Math.max(1, rw) * W, rdr.y / Math.max(1, rh) * H,
              Math.max(1.2, rdr.r / Math.max(1, rw) * W * 0.9), '210,228,250', 0.28);
-  }
-  /* 简化模式下的窗框 */
-  if (S.windowStyle > 0) {
-    var fa = W / Math.max(1, H), hhx, hhy, rad3;
-    if (S.windowStyle === 1) { hhx = 0.460 * fa; hhy = 0.355; rad3 = 0.055; }
-    else if (S.windowStyle === 2) { hhx = 0.440 * fa; hhy = 0.375; rad3 = 0.105; }
-    else { hhx = Math.min(0.255, 0.460 * fa); hhy = 0.340; rad3 = 0.210; }
-    rad3 = Math.min(rad3, Math.min(hhx, hhy) * 0.95);
-    var rx0 = W / 2 - hhx * H, ry0 = H / 2 - hhy * H;
-    var rwid = hhx * 2 * H, rhei = hhy * 2 * H, rr3 = rad3 * H;
-    c2.beginPath();
-    c2.rect(0, 0, W, H);
-    c2.moveTo(rx0 + rr3, ry0);
-    c2.arcTo(rx0 + rwid, ry0, rx0 + rwid, ry0 + rhei, rr3);
-    c2.arcTo(rx0 + rwid, ry0 + rhei, rx0, ry0 + rhei, rr3);
-    c2.arcTo(rx0, ry0 + rhei, rx0, ry0, rr3);
-    c2.arcTo(rx0, ry0, rx0 + rwid, ry0, rr3);
-    c2.closePath();
-    c2.fillStyle = S.windowStyle === 3 ? 'rgba(120,128,140,0.96)' :
-                   (S.windowStyle === 2 ? 'rgba(22,24,29,0.97)' : 'rgba(10,12,17,0.98)');
-    c2.fill('evenodd');
-    c2.strokeStyle = 'rgba(150,165,190,0.30)';
-    c2.lineWidth = Math.max(1, H * 0.002);
-    c2.stroke();
   }
   /* 降级模式下的水珠 */
   for (var i = 0; i < drops.length; i++) {
@@ -2011,6 +1917,7 @@ function toggleMic() { if (S.micOn) stopMic(); else startMic(); }
 /* ================================================================ 呼吸源 */
 function updateHoldCheck() {
   if (!S.down || S.mode === 'hold') return;
+  if (!MIST_WINDOWS.contains(aperture, S.lastX * S.cssW, S.lastY * S.cssH)) return;
   /* 停笔约 0.7 秒不动 → 在该处呼气；一动即恢复写字 */
   if (S.time - S.lastMoveT > 0.68 && S.time - S.downT > 0.72) {
     /* 按住不动 → 在该区域呼气 */
@@ -2059,6 +1966,10 @@ function updateBreath(dt) {
     if (S.micDriftY < -0.10) S.micDriftY = -0.10;
     tx = 0.5 + S.micDriftX; ty = 0.47 + S.micDriftY; rr = 0.30;
   }
+  if (!MIST_WINDOWS.contains(aperture, tx * S.cssW, ty * S.cssH)) {
+    tx = (aperture.x + aperture.w * 0.5) / S.cssW;
+    ty = (aperture.y + aperture.h * 0.5) / S.cssH;
+  }
   S.breathR = rr;
   var kk = Math.min(1, dt * 4);
   S.breathX += (tx - S.breathX) * kk;
@@ -2074,6 +1985,7 @@ function brushRadius() {
 }
 
 function fakePointerDown(cx, cy) {
+  if (!MIST_WINDOWS.contains(aperture, cx, cy)) return;
   try {
     var nx = clamp(cx / Math.max(1, S.cssW), 0, 1);
     var ny = clamp(cy / Math.max(1, S.cssH), 0, 1);
@@ -2099,6 +2011,10 @@ function fakePointerDown(cx, cy) {
 
 function fakePointerMove(cx, cy) {
   if (!S.down) return;
+  if (!MIST_WINDOWS.contains(aperture, cx, cy)) {
+    S.mode = "wipe"; S.lastX = cx / S.cssW; S.lastY = cy / S.cssH; S.lastMoveT = S.time;
+    return;
+  }
   try {
     var nx = clamp(cx / Math.max(1, S.cssW), 0, 1);
     var ny = clamp(cy / Math.max(1, S.cssH), 0, 1);
@@ -2279,9 +2195,16 @@ function nextScene() {
   showLabel(SCENES[S.sceneIndex].name);
 }
 
-var WINDOW_NAMES = ['普通窗', '车窗', '火车窗', '飞机舷窗'];
+var WINDOW_NAMES = ['无框玻璃', '车窗', '火车窗', '渡轮方窗', '飞机舷窗'];
 function nextWindow() {
   S.windowStyle = (S.windowStyle + 1) % WINDOW_NAMES.length;
+  fakePointerUp();
+  if (!S.customImg) {
+    S.sceneIndex = WINDOW_SCENES[S.windowStyle];
+    loadScene(S.sceneIndex);
+  }
+  syncFrame();
+  buildBackground();
   showLabel(WINDOW_NAMES[S.windowStyle]);
 }
 
@@ -2314,6 +2237,7 @@ if (debugMode) window.__mist = {
       fps: 1000 / Math.max(1, avg(qaFrames)), cpuMs: avg(qaCpu), frames: qaTicks,
       mic: S.micLevel, breath: S.breathLevel, fog: fogSum / Math.max(1, flen),
       centerFog: fogF ? fogF[centre] : 0, grid: [dw, dh], dpr: S.dpr, drops: drops.length,
+      aperture: aperture ? [aperture.x, aperture.y, aperture.w, aperture.h] : null,
       samplers: useGL ? 7 : 0, error: window.__dbgErr, look: originalLook ? 'original' : 'polished' };
   }
 };
@@ -2372,6 +2296,14 @@ function frame(t) {
 }
 
 /* ================================================================ 尺寸 */
+function syncFrame() {
+  aperture = MIST_WINDOWS.draw(frameCanvas, S.windowStyle, S.cssW, S.cssH, S.dpr);
+  hintEl.style.top = S.windowStyle ? ((aperture.y + aperture.h * 0.47) / S.cssH * 100) + '%' : '57%';
+  if (!MIST_WINDOWS.contains(aperture, S.lastPointer.x * S.cssW, S.lastPointer.y * S.cssH)) {
+    S.lastPointer.x = (aperture.x + aperture.w * 0.5) / S.cssW;
+    S.lastPointer.y = (aperture.y + aperture.h * 0.5) / S.cssH;
+  }
+}
 var resizeTimer = null;
 function applyResize() {
   var w = Math.max(1, window.innerWidth || document.documentElement.clientWidth);
@@ -2387,6 +2319,7 @@ function applyResize() {
   tmpC = null;
 
   setupSim(!!fogCanvas);
+  syncFrame();
   buildBackground();
   if (useGL && gl) gl.viewport(0, 0, S.bufW, S.bufH);
 }
@@ -2398,6 +2331,7 @@ function onResize() {
 /* ================================================================ 初始化 */
 function bindDom() {
   stage = document.getElementById('stage');
+  frameCanvas = document.getElementById('windowFrame');
   glass = document.getElementById('glass');
   flat = document.getElementById('flat');
   hintEl = document.getElementById('hint');

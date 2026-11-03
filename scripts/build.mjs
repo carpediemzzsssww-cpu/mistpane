@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-new vm.Script(fs.readFileSync(path.join(root, 'js/app.js'), 'utf8'));
+for (const script of ['windows.js', 'app.js']) {
+  new vm.Script(fs.readFileSync(path.join(root, 'js', script), 'utf8'));
+}
 const dist = path.join(root, 'dist');
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
