@@ -4,6 +4,8 @@
 
 > 窗外的灯还亮着。在玻璃上，写一个字。
 
+**[在线体验](https://mistpane.vercel.app)** · [原质感对照](https://mistpane.vercel.app/?look=original)
+
 一扇可以哈气、擦雾、写字的窗。四张旅行照片里，有雪地的暖灯、雨夜咖啡馆、海边红屋和天黑以前的街巷。
 
 ## 怎么玩

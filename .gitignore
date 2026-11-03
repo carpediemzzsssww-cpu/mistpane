@@ -23,3 +23,4 @@ output/
 __MACOSX/
 .idea/
 .vscode/
+.vercel
