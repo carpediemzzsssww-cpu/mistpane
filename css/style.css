@@ -132,3 +132,47 @@ body {
 
 /* Painted once on resize; the opening remains a real, interactive glass surface. */
 #windowFrame { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* Cabin layers: the grip is the only new control. The glass retains fog gestures. */
+#windowShade { position:absolute; pointer-events:none; }
+#windowShade[hidden], #shadeHandle[hidden] { display:none; }
+#cabinAmbient { position:absolute; left:0; top:0; right:0; bottom:0; background:#152331; pointer-events:none; opacity:0; }
+#shadeHandle {
+  position:absolute; width:88px; height:44px; padding:0; border:0; background:transparent;
+  cursor:grab; touch-action:none; outline:none; -webkit-tap-highlight-color:transparent;
+}
+#shadeHandle.dragging { cursor:grabbing; }
+#shadeHandle span {
+  display:block; width:56px; height:9px; margin:auto; border-radius:50% / 65%;
+  background:linear-gradient(#918e83,#b1aea3 37%,#dfdbd1 75%,#ede9df);
+  box-shadow:0 -1px 2px rgba(44,39,29,.18),0 1px 0 rgba(255,255,255,.75),0 2px 3px rgba(54,49,39,.12);
+}
+#shadeHandle:focus-visible span { outline:2px solid #879eae; outline-offset:5px; }
+body[data-window="4"] .btn, body[data-window="2"] .btn {
+  background:rgba(247,246,240,.45); border-color:rgba(72,76,73,.17); color:#626966;
+  box-shadow:0 3px 10px rgba(33,37,32,.08),inset 0 1px 0 rgba(255,255,255,.4);
+}
+body[data-window="4"] #melt, body[data-window="2"] #melt { background:rgba(243,242,237,.3); border-color:rgba(69,75,70,.14); box-shadow:none; }
+body[data-window="4"] .seg, body[data-window="2"] .seg { color:#747b77; }
+body[data-window="4"] .seg.on, body[data-window="2"] .seg.on { color:#404945; background:rgba(80,96,84,.10); }
+body[data-window="4"] #melt>svg, body[data-window="2"] #melt>svg { stroke:#7a847e; }
+body.cabin-dark .btn { color:#b9beba; background:rgba(18,24,27,.32); border-color:rgba(223,229,220,.12); box-shadow:none; }
+body.cabin-dark #melt { background:rgba(12,18,20,.12); border-color:rgba(223,229,220,.12); }
+body.cabin-dark .seg { color:#8e9694; } body.cabin-dark .seg.on { color:#d2d6d1; background:rgba(220,225,216,.1); }
+.btn { width:44px; height:44px; }
+.btn + .btn { margin-left:12px; }
+@media (max-width:650px) {
+  #hint { font-size:12px; letter-spacing:.10em; padding:0 36px; }
+  #hint b { font-size:10px; letter-spacing:.04em; }
+}
+@media (max-height:500px) {
+  #dock { left:auto; right:12px; bottom:12px; flex-direction:column; padding:0; }
+  .btn + .btn { margin-left:0; margin-top:5px; }
+  #melt { left:72px; bottom:16px; }
+  #hint b { display:none; }
+}
+
+#photoCredit { position:absolute; right:16px; bottom:112px; font-size:9px; letter-spacing:.02em; color:rgba(235,231,215,.55); }
+#photoCredit a { color:inherit; text-decoration:none; }
+#photoCredit a:hover { text-decoration:underline; }
+@media (max-height:500px) { #photoCredit { right:76px; bottom:20px; } }

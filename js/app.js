@@ -605,13 +605,15 @@ var SCENES = [
   { name: '雪谷，天还没暗', file: 'assets/photos/winter-valley.jpg', focus: [0.51, 0.51], tint: [0.89, 0.91, 0.89], saturation: 0.48, make: scenePines, seed: 90210 },
   { name: '雪地里，一盏暖灯', file: 'assets/photos/snow-cabin.jpg', focus: [0.57, 0.68], tint: [0.86, 0.90, 0.92], saturation: 0.52, make: scenePines, seed: 90210 },
   { name: '冷海边的红屋', file: 'assets/photos/coast.jpg', focus: [0.52, 0.46], tint: [0.86, 0.90, 0.91], saturation: 0.46, make: scenePines, seed: 90210 },
-  { name: '云海之上', file: 'assets/photos/cloud-sea.jpg', focus: [0.50, 0.45], tint: [0.88, 0.92, 0.96], saturation: 0.65, make: scenePines, seed: 90210 },
-  { name: '日落，云层安静下来', file: 'assets/photos/cloud-dusk.jpg', focus: [0.52, 0.48], tint: [0.93, 0.89, 0.83], saturation: 0.55, make: sceneBokeh, seed: 77112 }
+  { name: '云海之上', file: 'assets/photos/cloud-sea.jpg', focus: [0.50, 0.45], tint: [0.88, 0.92, 0.96], saturation: 0.82, make: scenePines, seed: 90210 },
+  { name: '日落，云层安静下来', file: 'assets/photos/cloud-dusk.jpg', focus: [0.52, 0.48], tint: [0.93, 0.89, 0.83], saturation: 0.55, make: sceneBokeh, seed: 77112 },
+  { name: '雨夜，一条暖色的街', file: 'assets/photos/rain-street.jpg', focus: [0.52, 0.57], tint: [0.94, 0.89, 0.80], saturation: 0.52, make: sceneBokeh, seed: 77112, credit: true },
+  { name: '里斯本，雨还没停', file: 'assets/photos/lisbon-rain.jpg', focus: [0.43, 0.52], tint: [0.93, 0.89, 0.81], saturation: 0.50, make: sceneBokeh, seed: 77112 }
 ];
-var WINDOW_SCENES = [0, 2, 1, 3, 4];
+var WINDOW_SCENES = [0, 6, 1, 3, 4];
 var originalLook = /(?:[?&])look=original(?:&|$)/.test(location.search);
 var debugMode = /(?:[?&])debug(?:[=&]|$)/.test(location.search);
-var sceneMatch = location.search.match(/[?&]scene=([0-5])(?:&|$)/);
+var sceneMatch = location.search.match(/[?&]scene=([0-7])(?:&|$)/);
 var windowMatch = location.search.match(/[?&]window=([0-4])(?:&|$)/);
 
 function loadScene(index) {
@@ -1304,6 +1306,9 @@ var FS_SRC = [
 'uniform vec2 uBuf;',
 'uniform float uTime;',
 'uniform float uPolish;',
+'uniform float uFlight;',
+'uniform float uCloudTime;',
+'uniform vec4 uAperture;',
 'uniform vec3 uFogTint;',
 'uniform float uRainAmt;',
 'uniform float uSnowAmt;',
@@ -1320,8 +1325,17 @@ var FS_SRC = [
 '  vec2 q = clamp(fract(p), vec2(0.00097656), vec2(0.99902344));',
 '  return texture2D(uGrain, vec2(q.x * 0.5, q.y));',
 '}',
+ 'float cloudNoise(vec2 p) {',
+'  vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);',
+'  return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);',
+'}',
+'float cloudField(vec2 p) {',
+'  return cloudNoise(p)*.57 + cloudNoise(p*2.03+4.1)*.28 + cloudNoise(p*4.11+13.7)*.15;',
+'}',
 'void main() {',
 '  vec2 uv = vUv;',
+'  vec2 local = (uv-uAperture.xy)/max(uAperture.zw,vec2(.001));',
+
 '',
 '  vec4 f = texture2D(uFog, uv);',
 '  float fog = f.r;',
@@ -1373,7 +1387,12 @@ var FS_SRC = [
 '  /* 雨滴掰弯背景光线；雾一厚，高频弯折即被散射掉 */',
 '  refr += clamp(rgrad * 0.00007, -0.012, 0.012) * (1.0 - 0.70 * fog);',
 '',
-'  vec2 buv = uv + refr;',
+ '  vec2 buv = uv + refr;',
+'  if (uFlight > .5) {',
+'    float depth=smoothstep(.30,1.0,local.y);',
+'    buv.x += sin(uCloudTime*.028)*(0.015+depth*.055)*uAperture.z;',
+'    buv.y += sin(uCloudTime*.017+local.x)*.012*depth*uAperture.w;',
+'  }',
 '  vec3 s0 = texture2D(uBg0, buv).rgb;',
 '  vec3 s1 = texture2D(uBg1, buv).rgb;',
 '  vec3 s2 = texture2D(uBg2, buv).rgb;',
@@ -1393,6 +1412,14 @@ var FS_SRC = [
 '  vec3 bg = mix(s0, s1, b1);',
 '  bg = mix(bg, s2, b2);',
 '',
+ '  if (uFlight > .5) {',
+'    vec2 cp=vec2(local.x*3.4+uCloudTime*.020,local.y*5.0);',
+'    float cloud=cloudField(cp);',
+'    float above=cloudField(cp+vec2(-.1,-.14));',
+'    float veil=smoothstep(.44,.73,cloud)*smoothstep(.52,.96,local.y)*.22;',
+'    vec3 cloudColor=vec3(.83,.88,.91)+(above-cloud)*.40;',
+'    bg=mix(bg,cloudColor,veil*(1.0-.55*d));',
+'  }',
 '  /* 外层雨：湿轨迹泛光 + 雨珠高光/暗缘（随后被内层雾一并散射） */',
 '  vec2 rld = normalize(vec2(-0.5, -0.86));',
 '  float rsp = pow(max(0.0, dot(normalize(rgrad + vec2(0.0001)), rld)), 6.0);',
@@ -1595,6 +1622,9 @@ function initGL() {
     buf: gl.getUniformLocation(prog, 'uBuf'),
     time: gl.getUniformLocation(prog, 'uTime'),
     polish: gl.getUniformLocation(prog, 'uPolish'),
+    flight: gl.getUniformLocation(prog, 'uFlight'),
+    cloudTime: gl.getUniformLocation(prog, 'uCloudTime'),
+    aperture: gl.getUniformLocation(prog, 'uAperture'),
     fogTint: gl.getUniformLocation(prog, 'uFogTint')
   };
   gl.uniform1i(U.fog, 0);
@@ -1637,7 +1667,12 @@ function switchToFlat(msg) {
 function drawCover(c2, img, w, h, focus) {
   var iw = img.naturalWidth || img.width || 0, ih = img.naturalHeight || img.height || 0;
   if (!iw || !ih) return;
-  var ap = MIST_WINDOWS.geometry(S.windowStyle, w, h);
+  var ap0 = MIST_WINDOWS.geometry(S.windowStyle, S.cssW, S.cssH), scale = w / S.cssW;
+  var ap = { x: ap0.x*scale, y: ap0.y*scale, w: ap0.w*scale, h: ap0.h*scale };
+  // Overscan allows cloud parallax without revealing the texture boundary.
+  if (S.windowStyle === 4 && !S.customImg && (S.sceneIndex === 4 || S.sceneIndex === 5)) {
+    ap.x -= ap.w*.12; ap.y -= ap.h*.12; ap.w *= 1.24; ap.h *= 1.24;
+  }
   var s = Math.max(ap.w / iw, ap.h / ih);
   var dww = iw * s, dhh = ih * s;
   var fx = focus ? focus[0] : 0.5, fy = focus ? focus[1] : 0.5;
@@ -1650,6 +1685,8 @@ function buildBackground() {
   if (S.cssW < 2 || S.cssH < 2) return;
   var tw = Math.max(8, Math.min(Math.round(S.cssW * S.dpr), 2000));
   var th = Math.max(8, Math.round(tw * S.cssH / S.cssW));
+  var credit=document.getElementById('photoCredit');
+  credit.innerHTML=!S.customImg&&SCENES[S.sceneIndex].credit?'<a href="https://commons.wikimedia.org/wiki/File:Warm_street_lights_glow_along_a_narrow_city_street_filled_with_parked_cars_on_a_rainy_night.jpg" target="_blank" rel="noopener noreferrer">Nenad Stojković</a> · <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank" rel="noopener noreferrer">CC BY 2.0</a> · 色彩调整':'';
   var source;
   if (S.customImg) {
     source = mkCanvas(tw, th);
@@ -1753,11 +1790,19 @@ function renderGL(t) {
   gl.uniform1f(U.rainAmt, S.rainAmt);
   gl.uniform1f(U.snowAmt, S.snowAmt);
   gl.uniform1f(U.time, t);
+  gl.uniform1f(U.flight, flightScene() ? 1 : 0);
+  gl.uniform1f(U.cloudTime, MIST_WINDOWS.state().reduced ? 0 : t);
+  gl.uniform4f(U.aperture, aperture.x/S.cssW, aperture.y/S.cssH, aperture.w/S.cssW, aperture.h/S.cssH);
   gl.uniform1f(U.polish, originalLook ? 0 : 1);
   gl.uniform3fv(U.fogTint, S.customImg ? [0.90, 0.91, 0.91] : SCENES[S.sceneIndex].tint);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
+function flightScene() { return S.windowStyle === 4 && !S.customImg && (S.sceneIndex === 4 || S.sceneIndex === 5); }
+function drawFlatBackground(ctx,img,t,W,H) {
+  var offset=flightScene()&&!MIST_WINDOWS.state().reduced?Math.sin(t*.028)*.035*aperture.w*S.dpr:0;
+  ctx.drawImage(img,offset,0,W,H);
+}
 function renderFlat(t) {
   if (!flatCtx) return;
   var W = S.bufW, H = S.bufH;
@@ -1767,14 +1812,14 @@ function renderFlat(t) {
   var c2 = flatCtx;
   c2.setTransform(1, 0, 0, 1, 0, 0);
   c2.clearRect(0, 0, W, H);
-  if (BG.sharp) c2.drawImage(BG.sharp, 0, 0, W, H);
+  if (BG.sharp) drawFlatBackground(c2, BG.sharp, t, W, H);
 
   if (fogCanvas && BG.blurB) {
     tmpCtx.setTransform(1, 0, 0, 1, 0, 0);
     tmpCtx.globalCompositeOperation = 'source-over';
     tmpCtx.globalAlpha = 1;
     tmpCtx.clearRect(0, 0, W, H);
-    tmpCtx.drawImage(BG.blurB, 0, 0, W, H);
+    drawFlatBackground(tmpCtx, BG.blurB, t, W, H);
     tmpCtx.globalCompositeOperation = 'destination-in';
     tmpCtx.drawImage(fogCanvas, 0, 0, W, H);
     tmpCtx.globalCompositeOperation = 'source-over';
@@ -1967,8 +2012,8 @@ function updateBreath(dt) {
     tx = 0.5 + S.micDriftX; ty = 0.47 + S.micDriftY; rr = 0.30;
   }
   if (!MIST_WINDOWS.contains(aperture, tx * S.cssW, ty * S.cssH)) {
-    tx = (aperture.x + aperture.w * 0.5) / S.cssW;
-    ty = (aperture.y + aperture.h * 0.5) / S.cssH;
+    var point=MIST_WINDOWS.breathPoint(aperture);
+    if(point){tx=point.x/S.cssW;ty=point.y/S.cssH;}else{S.breathLevel=0;lvl=0;}
   }
   S.breathR = rr;
   var kk = Math.min(1, dt * 4);
@@ -2054,7 +2099,7 @@ function fakePointerUp() {
 function targetInDock(target) {
   var el = target;
   while (el && el !== document) {
-    if (el.id === 'dock' || el.id === 'melt' || el.id === 'btnMic' || el.id === 'btnScene' ||
+    if (el.id === 'photoCredit' || el.id === 'shadeHandle' || el.id === 'dock' || el.id === 'melt' || el.id === 'btnMic' || el.id === 'btnScene' ||
         el.id === 'btnWeather' || el.id === 'btnWindow' || el.id === 'btnUpload') return true;
     el = el.parentNode;
   }
@@ -2238,7 +2283,7 @@ if (debugMode) window.__mist = {
       mic: S.micLevel, breath: S.breathLevel, fog: fogSum / Math.max(1, flen),
       centerFog: fogF ? fogF[centre] : 0, grid: [dw, dh], dpr: S.dpr, drops: drops.length,
       aperture: aperture ? [aperture.x, aperture.y, aperture.w, aperture.h] : null,
-      samplers: useGL ? 7 : 0, error: window.__dbgErr, look: originalLook ? 'original' : 'polished' };
+      shade: MIST_WINDOWS.state(), flight: flightScene(), samplers: useGL ? 7 : 0, error: window.__dbgErr, look: originalLook ? 'original' : 'polished' };
   }
 };
 
@@ -2253,6 +2298,8 @@ function frame(t) {
     if (dt > 0.05) dt = 0.05;
     if (dt < 0.001) dt = 0.001;
     S.time += dt;
+    MIST_WINDOWS.tick(dt);
+    if (MIST_WINDOWS.state().dragging && S.down) fakePointerUp();
     var f = clamp(dt * 60, 0.2, 2.2);
 
     updateHoldCheck();
@@ -2298,6 +2345,7 @@ function frame(t) {
 /* ================================================================ 尺寸 */
 function syncFrame() {
   aperture = MIST_WINDOWS.draw(frameCanvas, S.windowStyle, S.cssW, S.cssH, S.dpr);
+  hintEl.innerHTML=S.windowStyle===4?'按住玻璃哈气，划过写字<b>拖动上方把手，开合遮光板</b>':'按住玻璃哈气，划过写字<b>也可以按住空格，或打开麦克风</b>';
   hintEl.style.top = S.windowStyle ? ((aperture.y + aperture.h * 0.47) / S.cssH * 100) + '%' : '57%';
   if (!MIST_WINDOWS.contains(aperture, S.lastPointer.x * S.cssW, S.lastPointer.y * S.cssH)) {
     S.lastPointer.x = (aperture.x + aperture.w * 0.5) / S.cssW;

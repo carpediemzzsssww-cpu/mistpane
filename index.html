@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#04070c">
 <title>哈气 · Mistpane</title>
-<meta name="description" content="对着冬天的窗哈一口气，用手指在水雾上写字。六张安静的风景，雨雪、车窗、火车窗、渡轮窗与飞机舷窗。">
+<meta name="description" content="对着冬天的窗哈一口气，用手指在水雾上写字。八张安静的风景，雾气写字与可以拖动遮光板的飞机舷窗。">
 <link rel="icon" href="data:,">
 <link rel="preload" href="assets/photos/fog-house.jpg" as="image">
 <link rel="stylesheet" href="css/style.css">
@@ -15,7 +15,10 @@
 <div id="stage">
   <canvas id="glass" role="img" aria-label="结雾的玻璃窗，可以用手指擦开"></canvas>
   <canvas id="flat" hidden role="img" aria-label="结雾的玻璃窗，可以用手指擦开"></canvas>
+  <canvas id="windowShade" hidden aria-hidden="true"></canvas>
   <canvas id="windowFrame" aria-hidden="true"></canvas>
+  <div id="cabinAmbient" aria-hidden="true"></div>
+  <button id="shadeHandle" type="button" role="slider" aria-label="舷窗遮光板，拖动开合；方向键调节" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" aria-orientation="vertical" hidden><span></span></button>
   <div id="hint" aria-hidden="true">呼气，让玻璃起雾<b>按住画面 / 空格呼气 · 手指在雾上写字画画</b><b>底部按钮更换背景、随机天气 · 双击画面也可换天气</b></div>
   <div id="label" aria-hidden="true"></div>
   <div id="melt" role="group" aria-label="雾气消散速度">
@@ -24,6 +27,7 @@
     <button type="button" class="seg on" aria-label="中等消散">中</button>
     <button type="button" class="seg" aria-label="快速消散">快</button>
   </div>
+  <div id="photoCredit"></div>
   <div id="toast" role="status" aria-live="polite"></div>
 </div>
 
