@@ -1,0 +1,6 @@
+.git
+.vercel
+node_modules
+docs
+output
+README.md

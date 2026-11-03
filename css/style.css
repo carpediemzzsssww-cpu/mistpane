@@ -1,0 +1,131 @@
+
+/* Breath on Glass — 冬夜窗玻璃
+   兼容 Chrome 61：不使用 flex gap / env() / backdrop-filter 等新特性 */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  overflow: hidden; background: #04070c;
+}
+body {
+  position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color: #dfe7f2;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+#stage {
+  position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+  overflow: hidden; touch-action: none;
+}
+#glass, #flat {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  display: block; touch-action: none;
+}
+#flat[hidden] { display: none; }
+
+#hint {
+  position: absolute; left: 0; right: 0; top: 57%;
+  text-align: center; pointer-events: none;
+  font-size: 13px; line-height: 2.1; letter-spacing: .16em;
+  color: rgba(226,236,250,.60);
+  text-shadow: 0 1px 14px rgba(0,0,0,.7);
+  opacity: 0; transition: opacity 1.4s ease;
+}
+#hint b {
+  display: block; font-weight: 400; font-size: 11px;
+  letter-spacing: .2em; color: rgba(226,236,250,.40);
+}
+#label {
+  position: absolute; left: 0; right: 0; top: 9%;
+  text-align: center; pointer-events: none;
+  font-size: 11px; letter-spacing: .42em; text-indent: .42em;
+  color: rgba(226,236,250,.52);
+  text-shadow: 0 1px 12px rgba(0,0,0,.75);
+  opacity: 0; transition: opacity .7s ease;
+}
+#toast {
+  position: absolute; left: 50%; bottom: 116px;
+  -webkit-transform: translateX(-50%); transform: translateX(-50%);
+  max-width: 82%; text-align: center;
+  font-size: 12px; line-height: 1.5; letter-spacing: .04em;
+  color: rgba(232,240,252,.86);
+  background: rgba(7,13,23,.58);
+  border: 1px solid rgba(220,232,250,.12);
+  border-radius: 18px; padding: 8px 16px;
+  pointer-events: none; opacity: 0;
+  transition: opacity .45s ease;
+  box-shadow: 0 8px 28px rgba(0,0,0,.4);
+}
+#dock {
+  position: absolute; left: 0; right: 0; bottom: 20px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  padding: 0 14px; pointer-events: none;
+}
+.btn {
+  pointer-events: auto;
+  -webkit-appearance: none; appearance: none;
+  width: 40px; height: 40px; border-radius: 50%; padding: 0; margin: 0;
+  background: rgba(9,15,25,.44);
+  border: 1px solid rgba(214,228,248,.16);
+  color: rgba(226,236,250,.78);
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  box-shadow: 0 5px 20px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.07);
+  cursor: pointer; outline: none;
+  -webkit-transition: background .25s, border-color .25s, -webkit-transform .15s;
+  transition: background .25s, border-color .25s, transform .15s;
+}
+.btn + .btn { margin-left: 14px; }
+.btn:active { -webkit-transform: scale(.92); transform: scale(.92); background: rgba(20,30,46,.62); }
+.btn.active { border-color: rgba(255,206,150,.42); color: #ffd9ac; }
+@media (hover: hover) {
+  .btn:hover { background: rgba(16,25,40,.62); border-color: rgba(214,228,248,.3); }
+}
+.btn svg {
+  width: 19px; height: 19px; fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
+.btn .slash { opacity: 0; -webkit-transition: opacity .25s; transition: opacity .25s; }
+.btn.off .slash { opacity: 1; }
+/* 三档雾气消散速度：慢 / 中 / 快 */
+#melt {
+  position: absolute; left: 50%; bottom: 72px;
+  -webkit-transform: translateX(-50%); transform: translateX(-50%);
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  height: 26px; padding: 0 6px 0 8px;
+  background: rgba(7,12,20,.42);
+  border: 1px solid rgba(220,232,250,.12);
+  border-radius: 13px;
+  box-shadow: 0 5px 18px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06);
+}
+#melt > svg {
+  width: 14px; height: 14px; margin-right: 5px;
+  fill: none; stroke: rgba(210,224,244,.55); stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.seg {
+  -webkit-appearance: none; appearance: none;
+  width: 26px; height: 20px; padding: 0; margin: 0;
+  background: none; border: none; border-radius: 10px;
+  color: rgba(214,226,244,.48); font: inherit; font-size: 10px;
+  cursor: pointer; outline: none;
+  -webkit-transition: background .25s, color .25s; transition: background .25s, color .25s;
+}
+.seg + .seg { margin-left: 2px; }
+.seg.on { background: rgba(210,226,248,.14); color: rgba(240,246,255,.95); }
+#file { display: none; }
+
+/* Keep the supplied controls; give the phone home indicator its own space. */
+#dock { bottom: 20px; bottom: calc(20px + env(safe-area-inset-bottom)); }
+#melt { bottom: 72px; bottom: calc(72px + env(safe-area-inset-bottom)); }
+#toast { bottom: 116px; bottom: calc(116px + env(safe-area-inset-bottom)); }
+.btn:focus-visible, .seg:focus-visible { outline: 2px solid #e0c69c; outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  #hint, #label, #toast, .btn, .seg { transition: none; }
+}
