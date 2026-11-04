@@ -1,16 +1,17 @@
 # 哈气 · Mistpane
 
-![手机细笔迹与简洁工具栏](docs/preview.webp)
+![水珠在雾里长大、下滑，留下水痕](docs/preview.webp)
 
 > 窗外的灯还亮着。在玻璃上，写一个字。
 
 **[在线体验](https://mistpane.vercel.app)** · [白色火车窗](https://mistpane.vercel.app/?window=2) · [无框玻璃](https://mistpane.vercel.app/?window=0)
 
-一扇可以哈气、擦雾、写字的窗。阳光云海、雪地暖灯、暮色广场……8 张旅行照片，点一下就换一张。默认是白色飞机舷窗，拖动遮光板，房间的光线跟着变暗或变亮；也可以换成白色火车窗或全屏无框玻璃。
+一扇可以哈气、擦雾、写字的窗。玻璃本身是干净的，打开时水汽一片片凝上来；雾厚的地方过一会儿聚成水珠，长到够大就一顿一顿地滑下来，留下一道水痕；雾散了，没滑走的小水珠还会挂一阵。阳光云海、雪地暖灯、暮色广场……8 张旅行照片，点一下就换一张。默认是白色飞机舷窗，拖动遮光板，房间的光线跟着变暗或变亮；也可以换成白色火车窗或全屏无框玻璃。
 
 ## 怎么玩
 
-- 长按玻璃约 0.7 秒起雾，保持按住并拖动可以涂开雾气；松手后，再划就是擦雾写字。桌面也可按住空格哈气。
+- 长按玻璃，手指下的圆环合拢后开始起雾，保持按住并拖动可以涂开雾气；松手后，再划就是擦雾写字。桌面也可按住空格哈气，鼠标在玻璃上会显示笔刷大小。
+- 写字时被推到笔画下沿的水会聚成小水珠，横着写更容易挂珠；手指擦过水珠会把它抹掉。
 - 点「照片」直接切换下一张。保留原编号 01、02、03、04、07、14、18、20 的八张风景，换窗型时保留当前照片。
 - 天气按钮依次切换「晴 → 雨 → 雪」。双击玻璃也可以；拖动写字不会触发换天气。
 - 点「消散」在慢、中、快、不融化四档之间切换。「不融化」保留雾与字迹，仍可继续涂雾或擦写。雨量会自然渐强、渐弱，玻璃外侧的水珠断续滑落，留下湿痕。
@@ -37,4 +38,4 @@ npm run build
 
 ## English
 
-A winter window you can mist and draw through. Hold the glass, then drag to spread condensation; release and start a new stroke to wipe it away. Tap to cycle through eight travel photographs. Rain gradually changes intensity, with refracting droplets and wet trails on the outer glass; snow and clear weather are also available. White aircraft and train windows sit alongside a full-screen frameless view. Six tactile controls adapt to portrait and landscape screens. Save the current window, writing and droplets as a PNG without the controls. Mobile offers an image preview for long-press saving or system sharing. Uploaded photographs stay in your browser. No microphone permission; WebGL1 with a simplified Canvas2D fallback and no runtime dependencies.
+A winter window you can mist and draw through. The glass starts clear and fogs up; where condensation lingers, droplets nucleate, grow, and slide down in stick-slip steps, leaving clear trails and tiny beads behind. Hold the glass, then drag to spread condensation; release and start a new stroke to wipe it away. Tap to cycle through eight travel photographs. Rain gradually changes intensity, with refracting droplets and wet trails on the outer glass; snow and clear weather are also available. White aircraft and train windows sit alongside a full-screen frameless view. Six tactile controls adapt to portrait and landscape screens. Save the current window, writing and droplets as a PNG without the controls. Mobile offers an image preview for long-press saving or system sharing. Uploaded photographs stay in your browser. No microphone permission; WebGL1 with a simplified Canvas2D fallback and no runtime dependencies.

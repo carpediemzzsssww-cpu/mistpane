@@ -668,7 +668,7 @@ var S = {
 };
 
 var frameCanvas, aperture = null;
-var stage, glass, flat, flatCtx, hintEl, labelEl, toastEl,
+var stage, glass, flat, flatCtx, hintEl, labelEl, toastEl, ringEl, cursorEl,
     btnSave, btnMelt, btnScene, btnWeather, btnWindow, btnUpload, fileEl;
 var useGL = false, gl = null, prog = null, U = null;
 var fogTex = null, dropTex = null, grainTex = null;
@@ -696,11 +696,14 @@ var strokeDist = 0;
    WebGL 模式下 A=255（干净存储）；2D 降级模式下 A=密度（作为合成蒙版）。  */
 
 var dw = 0, dh = 0, flen = 0, densityScale = 0.1;
-var fogF = null, wetF = null, bareF = null;
+var fogF = null, wetF = null, bareF = null, resF = null;
+var goalF = null, introK = null, introT = 0;     /* 开场：玻璃先是干净的，水汽一片片凝上来 */
+var fogU8 = null;
+var DROP_CAP = 120;
+var sites = [];
 var ambF = null, accK = null, evpN = null, dotN = null;
 var scratchF = null;
 var fogCanvas = null, fogCtx = null, fogImg = null, fogBuf = null;
-var dropCanvas = null, dropCtx = null, dropImg = null, dropBuf = null;
 var drops = [];
 var naturalAcc = 0;
 
@@ -771,15 +774,22 @@ function buildStaticFields() {
 }
 
 function initFogArrays() {
-  var n = noise2D(777), x, y, i;
+  var n = noise2D(777), nk = noise2D(1999), x, y, i;
   fogF = new Float32Array(flen);
   wetF = new Float32Array(flen);
   bareF = new Float32Array(flen);
+  resF = new Float32Array(flen);
+  goalF = new Float32Array(flen);
+  introK = new Float32Array(flen);
+  introT = 0;
   for (y = 0; y < dh; y++) for (x = 0; x < dw; x++) {
     i = y * dw + x;
     var p = fbm(n, x / 46, y / 46);
     var p2 = n(x / 13 + 9, y / 13 + 31);
-    fogF[i] = clamp(0.46 + 0.32 * p + 0.06 * p2, 0.20, 0.86);
+    var yy = (y + 0.5) / dh, ex = Math.abs((x + 0.5) / dw * 2 - 1);
+    /* 冷玻璃下半部和两侧更容易结雾，上方中间薄一些，能透出窗外 */
+    goalF[i] = clamp(0.36 + 0.26 * p + 0.05 * p2 + 0.26 * yy * yy + 0.10 * sstep(0.6, 1, ex), 0.20, 0.86);
+    introK[i] = (0.25 + 1.25 * fbm(nk, x / 18, y / 18)) * (0.7 + 0.5 * yy + 0.4 * ex);
   }
 }
 
@@ -787,17 +797,19 @@ function setupSim(preserve) {
   var sz = simSize();
   if (preserve && fogCanvas && dw > 0 && (sz.w !== dw || sz.h !== dh)) {
     /* 尺寸变化时拉伸旧密度图，保留用户已擦出的笔迹 */
-    var old = fogCanvas, oFog = fogF, oWet = wetF, oBare = bareF, oW = dw, oH = dh;
+    var old = fogCanvas, oFog = fogF, oWet = wetF, oBare = bareF, oRes = resF, oGoal = goalF, oK = introK, oW = dw, oH = dh;
     var nc = mkCanvas(sz.w, sz.h), n2 = nc.getContext('2d');
     n2.imageSmoothingEnabled = true;
     n2.drawImage(old, 0, 0, sz.w, sz.h);
     dw = sz.w; dh = sz.h; flen = dw * dh; densityScale = sz.s;
-    fogF = new Float32Array(flen); wetF = new Float32Array(flen); bareF = new Float32Array(flen);
+    fogF = new Float32Array(flen); wetF = new Float32Array(flen); bareF = new Float32Array(flen); resF = new Float32Array(flen);
+    goalF = oGoal ? new Float32Array(flen) : null; introK = oGoal ? new Float32Array(flen) : null;
     for (var i = 0; i < flen; i++) {
       var x = i % dw, y = (i / dw) | 0;
       var ox = Math.min(oW - 1, (x * oW / dw) | 0), oy = Math.min(oH - 1, (y * oH / dh) | 0);
       var oi = oy * oW + ox;
-      fogF[i] = oFog[oi]; wetF[i] = oWet[oi]; bareF[i] = oBare[oi];
+      fogF[i] = oFog[oi]; wetF[i] = oWet[oi]; bareF[i] = oBare[oi]; resF[i] = oRes[oi];
+      if (oGoal) { goalF[i] = oGoal[oi]; introK[i] = oK[oi]; }
     }
     fogCanvas = nc; fogCtx = n2;
   } else {
@@ -807,10 +819,9 @@ function setupSim(preserve) {
     initFogArrays();
   }
   buildStaticFields();
-  fogImg = fogCtx.createImageData(dw, dh); fogBuf = fogImg.data;
-  dropCanvas = mkCanvas(dw, dh); dropCtx = dropCanvas.getContext('2d');
-  dropImg = dropCtx.createImageData(dw, dh); dropBuf = dropImg.data;
+  fogImg = fogCtx.createImageData(dw, dh); fogBuf = fogImg.data; fogU8 = null;
   drops.length = 0;
+  buildSites();
   scratchF = new Float32Array(flen);
   setupRain();
 }
@@ -860,7 +871,11 @@ function stampWipe(cx, cy, R) {
     if (q > 1.3) continue;
     i = py * dw + px;
     var erase = q < 0.6 ? 0.95 : (0.95 * (1 - sstep(0.6, 1.18, q)) + 0.05);
+    var F0 = fogF[i];
     fogF[i] *= (1 - erase);
+    resF[i] *= (1 - erase);
+    /* 手指把水推到笔画边上，堆成一圈稍大的水珠 */
+    if (q > 0.92) { var ridge = Math.min(1, F0 * 0.85 + 0.12) * (1 - sstep(1.12, 1.3, q)); if (ridge > resF[i]) resF[i] = ridge; }
     var wv = (1 - sstep(0.15, 1.25, q)) * 0.95;
     if (wv > wetF[i]) wetF[i] = wv;
     var bv = 1 - sstep(0.3, 1.3, q);
@@ -894,6 +909,12 @@ function relaxFog(f, m) {
     if (F < amb) F += accK[i] * m.ac * (0.40 + 0.70 * dotN[i]) * f * (amb - F);
     if (F < 0) F = 0; else if (F > 1) F = 1;
     fogF[i] = F; sum += F;
+    /* 残留水珠：跟着雾长起来，但比雾散得慢，雾退后还挂一阵 */
+    var R = resF[i];
+    if (m.hold) { /* 不融化：残留水珠也原样保留 */ }
+    else if (F > R) R += (F - R) * 0.12 * f;
+    else { R -= (0.00012 + 0.06 * evpN[i]) * m.ev * f; if (R < 0) R = 0; }
+    resF[i] = R;
     wetF[i] -= 0.0006 * m.ev * wetF[i] * f;      /* 湿痕随档位一同消退 */
     bareF[i] -= 0.00018 * m.ev * bareF[i] * f;
   }
@@ -917,36 +938,45 @@ function diffuseFog(c, f) {
 }
 
 /* ------------------------------------------------------------------ 水珠 */
-/* 终端速度：半径越大滑得越快（重力 vs 表面张力），并带个体差异 */
-function dropTerminal(r) {
-  var rc = r / Math.max(0.02, densityScale);   /* 换算成 css px 半径 */
-  var v = 0.10 * rc * rc;
-  v *= 0.65 + Math.random() * 0.7;             /* 同样大小也各不相同 */
-  if (rc < 4) v = Math.min(v, 1.0 + Math.random() * 0.9); /* 微珠几乎不动 */
-  return clamp(v, 0.3, 55);                     /* css px/s */
+/* 一颗水珠的一生：雾厚的地方慢慢成核 → 吸周围的水汽长大（周围留出一圈干净）
+   → 超过临界大小开始往下滑，走走停停，吞并路上的珠子越滑越快
+   → 沿途留下细小水珠；雾散了以后，没滑走的珠子慢慢蒸发变小。
+   坐标和半径都是雾气网格单位（texel），速度换算自 css px。 */
+function dropCritical() {
+  return clamp(Math.min(S.cssW, S.cssH) * 0.0062, 3.0, 5.4) * densityScale;
+}
+function dropSpeed(d) {
+  var e = d.r / d.rc - 0.66;
+  if (e <= 0) return 0;
+  return (7 + 78 * Math.pow(e, 1.5)) * d.vf * densityScale;   /* texels/s */
+}
+function spawnDrop(x, y, r, grow) {
+  if (drops.length >= DROP_CAP) return null;
+  var d = {
+    x: x, y: y, r: r, rc: dropCritical() * (0.82 + 0.4 * Math.random()),
+    vx: 0, vy: 0, maxV: 1, vf: 0.75 + 0.5 * Math.random(), gk: 0.7 + 0.8 * Math.random(),
+    grow: grow !== false, slide: false, pause: 0, wander: (Math.random() - 0.5) * 0.3,
+    dist: 0, nextPin: 0, nextBead: 0, age: 0, seed: Math.random(), dead: false
+  };
+  d.nextPin = d.r * (3 + Math.random() * 9);
+  d.nextBead = d.r * (2 + Math.random() * 4);
+  drops.push(d);
+  return d;
 }
 
-function spawnDrop(x, y, r, life) {
-  if (drops.length >= 46) return;
-  var cssV = dropTerminal(r);
-  var maxV = cssV / Math.max(0.05, densityScale);   /* texels/s */
-  drops.push({
-    x: x, y: y, r: r, vx: 0,
-    vy: maxV * (0.05 + Math.random() * 0.15),
-    maxV: maxV, accel: 0.9 + Math.random() * 2.2,   /* 加速快慢因珠而异 */
-    age: 0, life: life || (6 + Math.random() * 10), seed: Math.random(),
-    state: Math.random() < 0.45 ? 1 : 0,            /* 初始有的在滑、有的附着 */
-    stateT: 0.3 + Math.random() * 2.5, dead: false
-  });
+function fogAt(x, y) {
+  var xi = clamp(x | 0, 0, dw - 1), yi = clamp(y | 0, 0, dh - 1);
+  return fogF[yi * dw + xi];
 }
 
+/* 滑过的地方：把雾和残留水珠一起带走，返回收集到的水量 */
 function dropTrail(x0, y0, x1, y1, R) {
   // Droplets still move, while this mode preserves the writing underneath them.
-  if (MELT[S.melt].hold) return;
+  if (MELT[S.melt].hold) return 0;
   var dx = x1 - x0, dy = y1 - y0, len = Math.sqrt(dx * dx + dy * dy);
   var steps = Math.max(1, Math.ceil(len / Math.max(0.6, R * 0.45)));
   if (steps > 24) steps = 24;
-  var s, t, cx, cy, x0i, x1i, y0i, y1i, px, py, i2;
+  var s, t, cx, cy, x0i, x1i, y0i, y1i, px, py, i2, got = 0;
   for (s = 0; s <= steps; s++) {
     t = steps === 0 ? 0 : s / steps;
     cx = x0 + dx * t; cy = y0 + dy * t;
@@ -958,76 +988,166 @@ function dropTrail(x0, y0, x1, y1, R) {
       if (q > 1.15) continue;
       i2 = py * dw + px;
       var e = 1 - sstep(0, 1, q);
-      fogF[i2] *= (1 - 0.80 * e);
+      got += fogF[i2] * 0.82 * e;
+      fogF[i2] *= (1 - 0.82 * e);
+      resF[i2] *= (1 - 0.85 * e);
       var wv = (1 - sstep(0, 1.2, q)) * 0.85;
       if (wv > wetF[i2]) wetF[i2] = wv;
       var bv = 1 - sstep(0.2, 1.25, q);
       if (bv > bareF[i2]) bareF[i2] = bv;
     }
   }
+  return got / (steps + 1);
 }
 
-function updateDrops(dt) {
-  for (var i = drops.length - 1; i >= 0; i--) {
-    var d = drops[i];
-    d.age += dt;
-    /* 粘附—滑动状态机：切换间隔与停留时长随机 → 真实的走走停停 */
-    d.stateT -= dt;
-    if (d.stateT <= 0) {
-      if (d.state) { d.state = 0; d.stateT = 0.5 + Math.random() * 2.4; }
-      else { d.state = 1; d.stateT = 0.6 + Math.random() * 2.2; }
-    }
-    var target = d.state ? d.maxV : d.maxV * 0.05;
-    d.vy += (target - d.vy) * Math.min(1, dt * d.accel);
-    /* 缓慢侧向游走，下落轨迹略带弧度 */
-    d.vx = Math.sin(d.age * 0.9 + d.seed * 19.0) * Math.min(d.vy, d.maxV) * 0.10;
-    var nx = d.x + d.vx * dt, ny = d.y + d.vy * dt;
-    /* 快滑时轨迹细、慢爬时轨迹宽 */
-    var sn = clamp(d.vy / Math.max(1, d.maxV), 0, 1);
-    var tr = Math.max(1.2, d.r * (0.62 - 0.28 * sn));
-    dropTrail(d.x, d.y, nx, ny, tr);
-    d.x = nx; d.y = ny;
-    d.r -= d.r * 0.03 * dt * (0.5 + sn);   /* 滑动时把水留在轨迹上 */
-    if (ny > dh + d.r * 2 || d.age > d.life || d.r < 0.9) drops.splice(i, 1);
+/* 静止的水珠吸周围的水汽：留下一圈更干净的玻璃 */
+function dropAbsorb(d, dt) {
+  var R = d.r * 2.4, k = 0.22 * dt;
+  var x0 = Math.max(0, Math.floor(d.x - R)), x1 = Math.min(dw - 1, Math.ceil(d.x + R));
+  var y0 = Math.max(0, Math.floor(d.y - R)), y1 = Math.min(dh - 1, Math.ceil(d.y + R));
+  for (var py = y0; py <= y1; py++) for (var px = x0; px <= x1; px++) {
+    var dx = px + 0.5 - d.x, dy = py + 0.5 - d.y, q = Math.sqrt(dx * dx + dy * dy) / R;
+    if (q > 1) continue;
+    var i = py * dw + px, w = q < 0.42 ? 1 : 1 - sstep(0.42, 1, q);
+    fogF[i] *= 1 - Math.min(1, k * w * (q < 0.42 ? 6 : 1));
+    if (q < 0.5) resF[i] *= 1 - Math.min(1, k * 4);
   }
 }
 
-/* 合并：滑动的大水珠吞并沿途小珠 → 变大、提速（现实中最典型的凝结现象） */
+function updateDrops(dt) {
+  var m = MELT[S.melt] || MELT[1], hold = !!m.hold, i;
+  var cssPx = densityScale;
+  for (i = drops.length - 1; i >= 0; i--) {
+    var d = drops[i];
+    d.age += dt;
+    if (!d.slide) {
+      /* 附着：看外圈的雾，雾厚就长，雾散了就慢慢蒸发 */
+      var ring = d.r * 2.7;
+      var Fc = (fogAt(d.x - ring, d.y) + fogAt(d.x + ring, d.y) + fogAt(d.x, d.y - ring) + fogAt(d.x, d.y + ring)) * 0.25;
+      if (d.grow && Fc > 0.30) d.r += 0.70 * (Fc - 0.30) * d.gk * cssPx * dt;
+      else if (!hold) d.r -= (Fc < 0.18 ? 0.05 : 0.018) * m.ev * MELT_TIME * cssPx * dt * (d.grow ? 1 : 1.4);
+      if (!hold && d.grow) dropAbsorb(d, dt);
+      d.vy *= Math.exp(-dt * 10); d.vx *= Math.exp(-dt * 10);
+      if (d.r >= d.rc) { d.slide = true; d.grow = true; d.pause = 0; }
+    } else {
+      d.maxV = Math.max(1, dropSpeed(d));
+      if (d.pause > 0) d.pause -= dt;
+      var target = d.pause > 0 ? 0 : dropSpeed(d);
+      d.vy += (target - d.vy) * Math.min(1, dt * (target > d.vy ? 2.2 : 10));
+      /* 横向：慢慢游走，并偏向更干的一侧（沿旧水痕走） */
+      d.wander += (Math.random() - 0.5) * dt * 1.6;
+      d.wander = clamp(d.wander, -0.35, 0.35);
+      var ahead = d.y + d.r * 1.6;
+      var steer = clamp((fogAt(d.x - d.r * 1.3, ahead) - fogAt(d.x + d.r * 1.3, ahead)) * 1.4, -0.4, 0.4);
+      d.vx = d.vy * clamp(d.wander + steer, -0.45, 0.45);
+      var nx = d.x + d.vx * dt, ny = d.y + d.vy * dt;
+      var ds = Math.sqrt((nx - d.x) * (nx - d.x) + (ny - d.y) * (ny - d.y));
+      if (ds > 0) {
+        var sn = clamp(d.vy / Math.max(1, d.maxV), 0, 1);
+        var got = dropTrail(d.x, d.y, nx, ny, Math.max(1.0, d.r * (0.66 - 0.2 * sn)));
+        /* 质量：在干玻璃上留水变小，在雾上滑会顺路收水 */
+        var r2 = d.r * d.r * (1 - 0.0042 * ds / cssPx * 0.59) + got * 0.035;
+        d.r = Math.sqrt(Math.max(0, r2));
+        d.dist += ds;
+        if (d.dist > d.nextBead) {
+          d.nextBead = d.dist + d.r * (2.4 + Math.random() * 5.5);
+          if (Math.random() < 0.55) {
+            var br = d.r * (0.16 + Math.random() * 0.17);
+            var b = spawnDrop(d.x + (Math.random() - 0.5) * d.r * 0.7, d.y - d.r * (0.9 + Math.random() * 0.4), br, false);
+            if (b) d.r = Math.sqrt(Math.max(0, d.r * d.r - br * br * 0.8));
+          }
+        }
+        if (d.dist > d.nextPin) {
+          d.nextPin = d.dist + d.r * (3 + Math.random() * 10);
+          /* 碰到玻璃上的小瑕疵：小珠会顿一下，大珠直接冲过去 */
+          if (d.r < d.rc * 1.45 && Math.random() < 0.55) d.pause = 0.12 + Math.random() * (d.r < d.rc * 1.1 ? 1.4 : 0.5);
+        }
+      }
+      d.x = nx; d.y = ny;
+      if (d.r < d.rc * 0.6) { d.slide = false; d.grow = false; }
+    }
+    var bottom = aperture && aperture.type ? (aperture.y + aperture.h) * densityScale : dh;
+    if (d.y - d.r > Math.min(dh, bottom + 2) || d.r < 0.32 * cssPx) drops.splice(i, 1);
+  }
+}
+
+/* 合并：碰到就并成一颗（面积守恒略打折），并完更可能越过临界、立刻提速 */
 function mergeDrops() {
   var i, j;
   for (i = 0; i < drops.length; i++) {
     var a = drops[i];
-    if (a.dead || !a.state) continue;         /* 只有正在滑动的会吞并 */
+    if (a.dead) continue;
     for (j = 0; j < i; j++) {
       var b = drops[j];
-      if (b.dead) continue;
+      if (b.dead || (!a.slide && !b.slide && !a.grow && !b.grow)) continue;
       var dx = a.x - b.x, dy = a.y - b.y;
-      var rr = (a.r + b.r) * 0.9;
+      var rr = (a.r + b.r) * (a.slide || b.slide ? 0.92 : 0.82);
       if (dx * dx + dy * dy >= rr * rr) continue;
       var big = a.r >= b.r ? a : b;
       var small = big === a ? b : a;
-      big.r = Math.sqrt(big.r * big.r + small.r * small.r * 0.9);
-      big.maxV = dropTerminal(big.r) / Math.max(0.05, densityScale);
-      big.vy += small.vy * 0.25 + big.maxV * 0.06;   /* 动量叠加，立刻提速 */
-      big.life = Math.max(big.life, big.age + 6);
-      big.state = 1; big.stateT = 0.6 + Math.random() * 1.6;
+      var w = small.r * small.r / (big.r * big.r + small.r * small.r);
+      big.x += (small.x - big.x) * w * (big.slide ? 0.3 : 1);
+      big.y += (small.y - big.y) * w * (big.slide ? 0 : 1);
+      big.r = Math.sqrt(big.r * big.r + small.r * small.r * 0.92);
+      big.grow = true;
+      if (big.slide) { big.vy += Math.max(small.vy, 0) * 0.3; big.pause = 0; }
+      if (big.r >= big.rc) big.slide = true;
       small.dead = true;
     }
   }
-  var w = 0;
-  for (i = 0; i < drops.length; i++) if (!drops[i].dead) drops[w++] = drops[i];
-  drops.length = w;
+  var k = 0;
+  for (i = 0; i < drops.length; i++) if (!drops[i].dead) drops[k++] = drops[i];
+  drops.length = k;
 }
 
+/* 成核点：每隔约 26 css px 一个（带抖动）。雾持续够厚，水才会在这里聚成珠 */
+function buildSites() {
+  sites = [];
+  var sp = 26 * densityScale, cols = Math.ceil(dw / sp), rows = Math.ceil(dh / sp);
+  for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) {
+    var sx = (x + 0.15 + Math.random() * 0.7) * sp, sy = (y + 0.15 + Math.random() * 0.7) * sp;
+    if (sx >= dw || sy >= dh) continue;
+    sites.push({ x: sx, y: sy, i: (sy | 0) * dw + (sx | 0), acc: -Math.random() * 0.6, k: Math.random() < 0.58 ? 0 : 0.6 + Math.random() * 0.9, drop: null });
+  }
+}
 function naturalSpawn(dt) {
-  naturalAcc += dt;
-  if (naturalAcc < 0.45) return;
-  naturalAcc = 0;
-  if (drops.length >= 24) return;
-  var nx = Math.random() * dw, ny = Math.random() * dh * 0.7;
-  var fi = (ny | 0) * dw + (nx | 0);
-  /* 尺寸跨度大 → 有的几乎静止、有的缓缓滑落 */
-  if (fogF[fi] > 0.68 && Math.random() < 0.6) spawnDrop(nx, ny, 1.4 + Math.random() * 4.6);
+  if (MELT[S.melt].hold) return;
+  for (var n = 0; n < sites.length; n++) {
+    var st = sites[n], F = fogF[st.i];
+    if (st.drop && (st.drop.slide || drops.indexOf(st.drop) < 0)) st.drop = null;
+    if (!st.k) continue;
+    if (F > 0.42) st.acc += dt * (F - 0.42) * 0.85 * st.k;
+    else if (st.acc > 0) st.acc -= dt * 0.08;
+    if (st.acc >= 1 && !st.drop && drops.length < DROP_CAP - 30) {
+      st.acc = -Math.random() * 0.5;
+      var cx = st.x / densityScale, cy = st.y / densityScale;
+      if (!MIST_WINDOWS.contains(aperture, cx, cy)) continue;
+      st.drop = spawnDrop(st.x, st.y, (0.9 + Math.random() * 0.7) * densityScale, true);
+    }
+  }
+}
+
+/* 开场：干净的玻璃在一两秒里由下往上、一片片凝上水汽 */
+function introFog(dt) {
+  if (!goalF || MELT[S.melt].hold) return;
+  introT += dt;
+  var k = sstep(0.15, 1.4, introT) * dt * 1.6;
+  for (var i = 0; i < flen; i++) {
+    if (bareF[i] > 0.05) continue;
+    var g = goalF[i], F = fogF[i];
+    if (F < g) fogF[i] = F + (g - F) * Math.min(1, k * introK[i]);
+  }
+  if (introT > 5) { goalF = null; introK = null; }
+}
+
+/* 手指擦过：碰到的水珠被抹掉 */
+function wipeDrops(x0, y0, x1, y1, R) {
+  var dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy;
+  for (var i = drops.length - 1; i >= 0; i--) {
+    var d = drops[i], t = L2 > 0 ? clamp(((d.x - x0) * dx + (d.y - y0) * dy) / L2, 0, 1) : 0;
+    var ex = d.x - (x0 + dx * t), ey = d.y - (y0 + dy * t), lim = R * 0.95 + d.r * 0.3;
+    if (ex * ex + ey * ey < lim * lim) drops.splice(i, 1);
+  }
 }
 
 /* ================================================================ 外层降雨 */
@@ -1239,12 +1359,19 @@ function updateRain(dt) {
     d = rainDrops[i];
     var a = 0.60 + 0.40 * Math.min(1, d.r / 5);
     var rr = d.r * 1.08;
-    var g = rainHeadCtx.createRadialGradient(d.x, d.y, 0, d.x, d.y, rr);
+    /* 滑动中的雨珠被拉成上窄下圆的泪滴，静止的是略扁的圆 */
+    var sn = clamp(d.vy / Math.max(0.001, d.maxV), 0, 1) * (d.state ? 1 : 0.3);
+    var st = 1 + 0.38 * sn * Math.min(1, d.r / (2.5 * rainScale + 0.5));
+    var g = rainHeadCtx.createRadialGradient(0, 0, 0, 0, 0, rr);
     g.addColorStop(0, 'rgba(255,0,0,' + a + ')');
     g.addColorStop(0.55, 'rgba(255,0,0,' + (a * 0.88) + ')');
     g.addColorStop(1, 'rgba(255,0,0,0)');
     rainHeadCtx.fillStyle = g;
-    rainHeadCtx.beginPath(); rainHeadCtx.arc(d.x, d.y, rr, 0, Math.PI * 2); rainHeadCtx.fill();
+    rainHeadCtx.save();
+    rainHeadCtx.translate(d.x, d.y - rr * (st - 1) * 0.55);
+    rainHeadCtx.scale(1 / Math.sqrt(st), st * (d.state ? 1 : 0.94));
+    rainHeadCtx.beginPath(); rainHeadCtx.arc(0, 0, rr, 0, Math.PI * 2); rainHeadCtx.fill();
+    rainHeadCtx.restore();
   }
 
   /* 雪花：柔软失焦的亮点，失焦程度随大小变化（近大远小） */
@@ -1307,49 +1434,17 @@ function uploadRainTexture() {
   gl.activeTexture(gl.TEXTURE0);
 }
 
-/* 把密度场写入画布；WebGL 模式下 A=255，2D 模式下 A=密度（合成蒙版） */
+/* 打包密度场：WebGL 直接上传数组（A = 残留水珠）；2D 模式写进画布（A = 雾，作合成蒙版） */
 function writeFogCanvas() {
-  var b = fogBuf, f = fogF, w = wetF, ba = bareF, i, o;
+  var b = fogBuf, f = fogF, w = wetF, ba = bareF, r = resF, i, o;
   for (i = 0; i < flen; i++) {
     o = i << 2;
     b[o] = f[i] * 255;
     b[o + 1] = w[i] * 255;
     b[o + 2] = ba[i] * 255;
-    b[o + 3] = useGL ? 255 : f[i] * 255;
+    b[o + 3] = useGL ? r[i] * 255 : (1 - Math.exp(-3.1 * f[i])) * 0.96 * 255;
   }
-  fogCtx.putImageData(fogImg, 0, 0);
-}
-
-/* 水珠头部遮罩 + 解析梯度（用作透镜法线）；G/B=128 表示零梯度 */
-function writeDropCanvas() {
-  var b = dropBuf, i, o;
-  for (i = 0; i < flen; i++) { o = i << 2; b[o] = 0; b[o + 1] = 128; b[o + 2] = 128; b[o + 3] = 255; }
-  for (i = 0; i < drops.length; i++) {
-    var d = drops[i], R = d.r;
-    if (R < 0.8) continue;
-    var x0 = Math.max(0, Math.floor(d.x - R * 1.15)), x1 = Math.min(dw - 1, Math.ceil(d.x + R * 1.15));
-    var y0 = Math.max(0, Math.floor(d.y - R * 1.15)), y1 = Math.min(dh - 1, Math.ceil(d.y + R * 1.15));
-    for (var py = y0; py <= y1; py++) for (var px = x0; px <= x1; px++) {
-      var ddx = px - d.x, ddy = py - d.y;
-      var dist = Math.sqrt(ddx * ddx + ddy * ddy);
-      if (dist > R * 1.10) continue;
-      var t = clamp((R * 1.10 - dist) / (R * 0.5), 0, 1);
-      var v = t * t * (3 - 2 * t);
-      var dvdd = -6 * t * (1 - t) / (R * 0.5);
-      var gx = 0, gy = 0;
-      if (dist > 0.35) {
-        gx = dvdd * dw * ddx / (dist * R);
-        gy = dvdd * dh * ddy / (dist * R);
-      }
-      var ex = clamp(gx * 0.0015, -1, 1), ey = clamp(gy * 0.0015, -1, 1);
-      var oo = (py * dw + px) << 2;
-      b[oo] = v * 255;
-      b[oo + 1] = (0.5 + ex * 0.5) * 255;
-      b[oo + 2] = (0.5 + ey * 0.5) * 255;
-      b[oo + 3] = 255;
-    }
-  }
-  dropCtx.putImageData(dropImg, 0, 0);
+  if (!useGL) fogCtx.putImageData(fogImg, 0, 0);
 }
 
 /* ================================================================ WebGL */
@@ -1370,7 +1465,6 @@ var FS_SRC = [
 '#endif',
 'varying vec2 vUv;',
 'uniform sampler2D uFog;',
-'uniform sampler2D uDrop;',
 'uniform sampler2D uBg0;',
 'uniform sampler2D uBg1;',
 'uniform sampler2D uBg2;',
@@ -1379,91 +1473,83 @@ var FS_SRC = [
 'uniform vec2 uRainTexel;',
 'uniform vec2 uTexel;',
 'uniform vec2 uBuf;',
+'uniform float uDpr;',
 'uniform float uTime;',
-'uniform float uPolish;',
-'uniform float uMist;',
 'uniform float uFlight;',
 'uniform float uCloudTime;',
 'uniform vec4 uAperture;',
 'uniform vec3 uFogTint;',
 'uniform float uRainAmt;',
 'uniform float uSnowAmt;',
-'const float GE = 0.004;',
-'const float DE = 0.0015;',
+'const vec2 LDIR = vec2(-0.479, -0.878);',
 '',
 'float hash21(vec2 p) {',
 '  vec3 p3 = fract(vec3(p.xyx) * 0.1031);',
 '  p3 += dot(p3, p3.yzx + 33.33);',
 '  return fract((p3.x + p3.y) * p3.z);',
 '}',
-'',
-'vec4 grainSample(vec2 p) {',
-'  vec2 q = clamp(fract(p), vec2(0.00097656), vec2(0.99902344));',
-'  return texture2D(uGrain, vec2(q.x * 0.5, q.y));',
-'}',
- 'float cloudNoise(vec2 p) {',
+'float cloudNoise(vec2 p) {',
 '  vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);',
 '  return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);',
 '}',
 'float cloudField(vec2 p) {',
 '  return cloudNoise(p)*.57 + cloudNoise(p*2.03+4.1)*.28 + cloudNoise(p*4.11+13.7)*.15;',
 '}',
+'/* Atlas: grain | glass (top), fine beads | coarse beads (bottom). */',
+'vec4 atlas(vec2 p, vec2 o) {',
+'  vec2 q = clamp(fract(p), vec2(0.0009766), vec2(0.9990234));',
+'  return texture2D(uGrain, o + q * 0.5);',
+'}',
+'float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }',
+'',
 'void main() {',
 '  vec2 uv = vUv;',
 '  vec2 local = (uv-uAperture.xy)/max(uAperture.zw,vec2(.001));',
-
+'  vec2 css = uv * uBuf / uDpr;',
+'  vec2 pxUv = uDpr / uBuf;',
 '',
+'  /* R 凝结水汽  G 湿痕  B 擦过的历史  A 残留水珠（比雾散得慢） */',
 '  vec4 f = texture2D(uFog, uv);',
-'  float fog = f.r;',
-'  float wet = f.g;',
-'  float bare = f.b;',
-'',
+'  float fog = f.r, wet = f.g, res = f.a;',
 '  float fl = texture2D(uFog, uv - vec2(uTexel.x, 0.0)).r;',
 '  float fr = texture2D(uFog, uv + vec2(uTexel.x, 0.0)).r;',
 '  float fu = texture2D(uFog, uv - vec2(0.0, uTexel.y)).r;',
 '  float fd = texture2D(uFog, uv + vec2(0.0, uTexel.y)).r;',
 '  vec2 fg = vec2(fr - fl, fd - fu) / (2.0 * uTexel);',
 '',
-'  vec4 d4 = texture2D(uDrop, uv);',
-'  float dv = d4.r;',
-'  vec2 dg = (d4.gb - 0.5) * (2.0 / DE);',
-'',
-'  /* 外层降雨：水珠圆顶遮罩 + 湿轨迹（位于雾气之后） */',
 '  vec4 rn = texture2D(uRain, uv);',
-'  float rHead = rn.r;',
-'  float rTrail = rn.g;',
-'  float rSnow = rn.b;',
+'  float rHead = rn.r, rTrail = rn.g, rSnow = rn.b;',
 '  float rrl = texture2D(uRain, uv - vec2(uRainTexel.x, 0.0)).r;',
 '  float rrr = texture2D(uRain, uv + vec2(uRainTexel.x, 0.0)).r;',
 '  float rru = texture2D(uRain, uv - vec2(0.0, uRainTexel.y)).r;',
 '  float rrd = texture2D(uRain, uv + vec2(0.0, uRainTexel.y)).r;',
-'  vec2 rgrad = vec2(rrr - rrl, rrd - rru) / (2.0 * uRainTexel);',
+'  vec2 rgrad = vec2(rrr - rrl, rrd - rru);',
 '',
-'  vec2 gq = uv * uBuf / 512.0;',
-'  vec4 gi = grainSample(gq);',
+'  vec4 gi = atlas(css / 300.0, vec2(0.0));',
 '  float hgt = gi.r;',
 '  vec2 gn = (gi.gb - 0.5) * 2.0;',
+'  float macro = atlas(css / 1500.0 + vec2(0.31, 0.57), vec2(0.0)).r;',
+'  float d = clamp(fog * (0.96 + 0.08 * hgt) + (hgt - 0.5) * 0.05 * smoothstep(0.05, 0.4, fog), 0.0, 1.0);',
 '',
-'  /* 第二尺度：宏观凝结差异 —— 细密雾区 vs 粗大水珠区 */',
-'  vec4 gi2 = grainSample(gq * 0.21 + vec2(0.31, 0.57));',
-'  float macro = gi2.r;',
-'  vec2 gn2 = (gi2.gb - 0.5) * 2.0;',
+'  /* 细密凝结珠：雾薄时碎成一粒粒，雾厚时连成乳白一片 */',
+'  vec4 fb = atlas(css / 179.0, vec2(0.0, 0.5));',
+'  vec2 fp = (fb.gb - 0.5) * 3.0;',
+'  float fr2 = dot(fp, fp);',
+'  float fIn = 1.0 - smoothstep(0.70, 1.0, fr2);',
+'  float speck = fIn * smoothstep(fb.r - 0.06, fb.r + 0.04, d * 1.7);',
+'  float sparse = 1.0 - smoothstep(0.10, 0.40, d);',
 '',
-'  /* 玻璃外表面独立一层：不随雾气增减 */',
-'  vec4 gsv = texture2D(uGrain, vec2(0.50048828 + uv.x * 0.49902344, 0.00097656 + uv.y * 0.99804688));',
+'  /* 稍大的水珠：跟着残留水量出现，雾散以后还挂一阵 */',
+'  vec4 cb = atlas(css / 236.0 + vec2(0.37, 0.11), vec2(0.5, 0.5));',
+'  vec2 cp = (cb.gb - 0.5) * 3.0;',
+'  float cr2 = dot(cp, cp);',
+'  float cIn = 1.0 - smoothstep(0.72, 1.0, cr2);',
+'  /* 雾厚时大珠藏在乳白里，只在雾薄、刚散开或笔画边上显出来 */',
+'  float cv = cIn * smoothstep(cb.r - 0.05, cb.r + 0.03, res * 1.1) * (0.18 + 0.82 * (1.0 - smoothstep(0.12, 0.42, d)));',
 '',
-'  /* 颗粒只做微扰：雾层整体均匀，细节靠细珠体现 */',
-'  float d = clamp(fog * (0.98 + 0.06 * hgt) + (hgt - 0.5) * 0.07 * smoothstep(0.05, 0.4, fog), 0.0, 1.0);',
-'',
-'  /* 折射：雾层梯度 + 细珠微法线 + 粗珠弯折 + 水珠透镜 */',
-'  vec2 refr = clamp(fg * 0.00025, -0.010, 0.010);',
-'  refr += gn * 0.0026 * d;',
-'  refr += gn2 * 0.0025 * macro * d;',
-'  refr += clamp(dg * 0.000025, -0.02, 0.02) * dv;',
-'  /* 雨滴掰弯背景光线；雾一厚，高频弯折即被散射掉 */',
-'  refr += clamp(rgrad * 0.00007, -0.012, 0.012) * (1.0 - 0.70 * fog);',
-'',
- '  vec2 buv = uv + refr;',
+'  vec2 refr = clamp(fg * 0.00022, -0.008, 0.008);',
+'  refr += gn * 0.0016 * d;',
+'  vec2 buv = uv + refr;',
 '  if (uFlight > .5) {',
 '    float depth=smoothstep(.30,1.0,local.y);',
 '    buv.x += sin(uCloudTime*.028)*(0.015+depth*.055)*uAperture.z;',
@@ -1472,144 +1558,156 @@ var FS_SRC = [
 '  vec3 s0 = texture2D(uBg0, buv).rgb;',
 '  vec3 s1 = texture2D(uBg1, buv).rgb;',
 '  vec3 s2 = texture2D(uBg2, buv).rgb;',
+'  float b1 = smoothstep(0.03, 0.34, d);',
+'  float b2 = smoothstep(0.12, 0.70, d);',
+'  vec3 bg = mix(mix(s0, s1, b1), s2, b2);',
 '',
-'  float ca = 0.0022 * dot(uv - 0.5, uv - 0.5) * (1.0 - d);',
-'  vec2 cdx = (uv - 0.5) * ca;',
-'  s0.r = texture2D(uBg0, buv + cdx).r;',
-'  s0.b = texture2D(uBg0, buv - cdx).b;',
-'',
-'  /* 局部模糊：雾层虚化基本一致，粗珠区只略微透亮 */',
-'  float clarity = 1.0 - 0.22 * macro;',
-'  float b1 = smoothstep(0.04, 0.5, d * clarity);',
-'  float b2 = smoothstep(0.30, 0.95, d * clarity);',
-'  // Dense condensation scatters detail earlier; the simulation density is unchanged.',
-'  b1 = mix(b1, smoothstep(0.025, 0.32, d), uMist);',
-'  b2 = mix(b2, smoothstep(0.10, 0.68, d), uMist);',
-'  float corner = smoothstep(0.28, 0.85, length(uv - 0.5));',
-'  b2 = clamp(b2 + corner * 0.20, 0.0, 1.0);',
-'',
-'  vec3 bg = mix(s0, s1, b1);',
-'  bg = mix(bg, s2, b2);',
-'',
- '  if (uFlight > .5) {',
-'    vec2 cp=vec2(local.x*3.4+uCloudTime*.020,local.y*5.0);',
-'    float cloud=cloudField(cp);',
-'    float above=cloudField(cp+vec2(-.1,-.14));',
+'  if (uFlight > .5) {',
+'    vec2 cpos=vec2(local.x*3.4+uCloudTime*.020,local.y*5.0);',
+'    float cloud=cloudField(cpos);',
+'    float above=cloudField(cpos+vec2(-.1,-.14));',
 '    float veil=smoothstep(.44,.73,cloud)*smoothstep(.52,.96,local.y)*.22;',
 '    vec3 cloudColor=vec3(.83,.88,.91)+(above-cloud)*.40;',
 '    bg=mix(bg,cloudColor,veil*(1.0-.55*d));',
 '  }',
-'  /* 外层雨：湿轨迹泛光 + 雨珠高光/暗缘（随后被内层雾一并散射） */',
-'  vec2 rld = normalize(vec2(-0.5, -0.86));',
-'  float rsp = pow(max(0.0, dot(normalize(rgrad + vec2(0.0001)), rld)), 6.0);',
-'  bg += vec3(0.50, 0.64, 0.82) * rTrail * 0.10 * (0.55 + 0.45 * fog);',
-'  bg += vec3(0.90, 0.94, 1.00) * rHead * (0.05 + 0.50 * rsp) * (1.0 - 0.50 * fog);',
-'  bg -= vec3(0.05, 0.06, 0.07) * rHead * (1.0 - rsp) * 0.30;',
-'  /* 雪花：柔和亮点，雾厚时被散射得更虚 */',
+'',
+'  /* 窗外雨珠：小透镜，倒映出外面的景，边缘暗、顶上一点高光 */',
+'  float rIn = smoothstep(0.05, 0.32, rHead);',
+'  float rgl = length(rgrad);',
+'  vec2 rdir = rgrad / max(rgl, 0.0001);',
+'  float rp = clamp(1.0 - rHead * 1.15, 0.0, 1.0);',
+'  vec3 rcol = texture2D(uBg0, buv + rdir * rp * 6.0 * pxUv).rgb;',
+'  rcol *= 1.0 - 0.48 * smoothstep(0.40, 0.95, rp);',
+'  rcol += vec3(0.96, 0.97, 1.0) * pow(max(0.0, dot(-rdir, LDIR)), 9.0) * smoothstep(0.25, 0.75, rp) * 0.50;',
+'  rcol += rcol * pow(max(0.0, dot(rdir, LDIR)), 3.0) * smoothstep(0.15, 0.7, rp) * 0.22;',
+'  bg = mix(bg, rcol, rIn * (1.0 - 0.75 * b2));',
+'  bg += vec3(0.62, 0.70, 0.82) * rTrail * 0.06 * (1.0 - b2);',
 '  float snowMix = uSnowAmt / max(0.001, uSnowAmt + uRainAmt);',
-'  bg = mix(bg, mix(vec3(.48,.58,.66),vec3(.96,.98,1.0),snowMix), rSnow * mix(.72,.90,snowMix) * (1.0-.45*fog));',
+'  bg = mix(bg, mix(vec3(.50,.58,.66),vec3(.97,.98,1.0),snowMix), rSnow * mix(.62,.90,snowMix) * (1.0-.45*fog));',
+'  bg = mix(bg, bg * vec3(0.90, 0.93, 0.98) + vec3(0.01, 0.016, 0.03), uRainAmt * 0.40);',
+'  bg = mix(bg, bg * vec3(0.98, 1.0, 1.03) + vec3(0.025, 0.03, 0.04), uSnowAmt * 0.35);',
 '',
-'  /* 雨雪带来的空气透视：雨中更沉更暗，雪中更亮更平 */',
-'  bg = mix(bg, bg * vec3(0.84, 0.88, 0.97) + vec3(0.015, 0.025, 0.045), uRainAmt * 0.55);',
-'  bg = mix(bg, bg * vec3(0.96, 0.99, 1.06) + vec3(0.03, 0.04, 0.055), uSnowAmt * 0.45);',
+'  /* 水汽：前向散射的乳白，保留窗外的色彩和亮处的光晕 */',
+'  float L2 = luma(s2);',
+'  vec3 diffuse = mix(s2, vec3(L2), 0.26);',
+'  vec3 room = mix(uFogTint, vec3(1.0), 0.45);',
+'  vec3 milky = diffuse * 0.76 + room * (0.17 + 0.18 * L2);',
+'  milky += max(s2 - 0.55, vec3(0.0)) * 0.42;',
+'  milky *= (0.985 + 0.03 * hgt) * (1.0 - 0.06 * uRainAmt);',
+'  milky += vec3(0.02, 0.024, 0.03) * uSnowAmt;',
+'  milky -= max(milky - 0.80, vec3(0.0)) * 0.55;',
+'  float op = (1.0 - exp(-3.1 * d * (1.04 - 0.12 * macro))) * 0.94;',
+'  op *= mix(1.0, clamp(speck * 1.9, 0.0, 1.0), sparse);',
+'  vec3 col = mix(bg, milky, op);',
 '',
-'  /* 凝结散射：整面均匀乳白，仅随颗粒细微起伏 */',
-'  float op = 1.0 - exp(-3.2 * d * (1.06 - 0.22 * macro));',
-'  vec3 fogc = vec3(0.30, 0.33, 0.39) * (0.92 + 0.16 * hgt) + bg * (0.26 + 0.08 * macro);',
-'  fogc += vec3(0.030, 0.018, 0.006) * (1.0 - d * 0.5);',
-'  fogc += vec3(0.030, 0.035, 0.045) * bare * (1.0 - d);',
-'  float sceneLight = dot(s2, vec3(0.2126, 0.7152, 0.0722));',
-'  vec3 photoFog = bg * 0.46 + uFogTint * (0.16 + 0.16 * sceneLight);',
-'  fogc = mix(fogc, photoFog, uPolish * 0.55);',
-'  // Soft room light and a broad scene glow, inspired by the earlier renderer.',
-'  // Scattering follows local density; it disappears completely in a wiped stroke.',
-'  vec3 scatterTint = mix(uFogTint, vec3(0.94), 0.60);',
-'  vec3 scatter = scatterTint * (0.39 + 0.46 * sceneLight);',
-'  vec3 bloom = max(s2 - 0.58, vec3(0.0));',
-'  scatter += mix(bloom, vec3(dot(bloom, vec3(0.2126, 0.7152, 0.0722))), 0.65) * 0.20;',
-'  vec3 mistColor = mix(s2, scatter, 0.80);',
-'  mistColor *= (0.995 + 0.010 * hgt) * (1.0 - .075*uRainAmt);',
-'  mistColor += vec3(.020,.025,.030) * uSnowAmt;',
-'  fogc = mix(fogc, mistColor, uMist);',
-'  vec3 col = mix(bg, fogc, op * 0.96);',
+'  vec2 hp = LDIR * 0.42;',
+'  float fHi = exp(-dot(fp - hp, fp - hp) * 16.0) * fIn;',
+'  col += vec3(1.0) * fHi * speck * (0.03 + 0.05 * sparse);',
+'  col -= col * smoothstep(0.45, 1.0, fr2) * fIn * speck * 0.16 * sparse;',
 '',
-'  /* 水膜：密度极高处微珠并成连续水膜，更透更亮泽 */',
-'  float film = smoothstep(0.80, 1.0, d) * (1.0 - macro);',
-'  col = mix(col, col * vec3(0.90, 0.94, 1.02) + vec3(0.04, 0.05, 0.06), film * 0.45);',
+'  vec3 bead = texture2D(uBg1, buv - cp * 2.6 * pxUv).rgb;',
+'  bead *= 1.0 - 0.46 * smoothstep(0.35, 1.0, cr2);',
+'  bead += vec3(1.0) * exp(-dot(cp - hp, cp - hp) * 14.0) * 0.24;',
+'  bead += bead * exp(-dot(cp + hp * 0.7, cp + hp * 0.7) * 6.0) * 0.22;',
+'  bead = mix(bead, milky * 1.03, smoothstep(0.15, 0.6, d) * 0.7);',
+'  col = mix(col, bead, cv * 0.9);',
 '',
-'  /* 湿玻璃更暗、更亮泽 */',
-'  float wl = wet * (1.0 - d * 0.75);',
-'  col *= 1.0 - 0.14 * wl;',
+'  /* 擦过的地方：玻璃微湿，堆起来的水脊略亮 */',
+'  col *= 1.0 - 0.045 * wet * (1.0 - d);',
+'  float edge = smoothstep(6.0, 60.0, length(fg));',
+'  col = mix(col, milky * 1.06, edge * 0.08 * smoothstep(0.1, 0.5, d));',
 '',
-'  /* 潮湿边缘：密度突变处一线受光的水痕 */',
-'  float edge = smoothstep(4.0, 55.0, length(fg));',
-'  col += mix(vec3(0.62, 0.72, 0.88), uFogTint, uPolish * 0.55) * edge * (0.04 + 0.16 * wet);',
+'  /* 干净玻璃：一道很淡的天光反射 + 双层玻璃的淡重影 */',
+'  float rA = 1.0 - smoothstep(0.0, 0.14, abs((uv.x * 0.72 + uv.y * 0.70) - 0.82));',
+'  col += vec3(0.75, 0.82, 0.92) * rA * rA * 0.022;',
+'  vec3 ghost = texture2D(uBg1, buv + vec2(0.006, -0.004)).rgb;',
+'  col += ghost * smoothstep(0.45, 0.95, luma(ghost)) * 0.035 * (1.0 - op);',
 '',
-'  /* 细密凝结颗粒：均匀细珠上的微弱高光 */',
-'  vec2 ldir = normalize(vec2(-0.5, -0.86));',
-'  float sp = pow(max(0.0, dot(normalize(gn + vec2(0.0001)), ldir)), 7.0);',
-'  float beads = smoothstep(0.68, 0.98, hgt) * d;',
-'  col += vec3(0.85, 0.90, 1.00) * beads * (0.02 + 0.30 * sp) * (0.70 + 0.30 * macro) * mix(1.0, 0.35, uMist);',
-'  col -= vec3(0.05, 0.06, 0.075) * (1.0 - smoothstep(0.08, 0.45, hgt)) * d * 0.32 * mix(1.0, 0.20, uMist);',
-'',
-'  /* 局部略粗的水珠：很轻的亮心与暗缘 */',
-'  float bigBead = smoothstep(0.68, 0.95, macro) * d;',
-'  float sp2 = pow(max(0.0, dot(normalize(gn2 + vec2(0.0001)), ldir)), 6.0);',
-'  col += vec3(0.80, 0.86, 0.97) * bigBead * (0.03 + 0.16 * sp2) * mix(1.0, 0.30, uMist);',
-'  col -= vec3(0.04, 0.05, 0.065) * smoothstep(0.30, 0.72, hgt) * bigBead * 0.28 * mix(1.0, 0.18, uMist);',
-'',
-'  // Subpixel condensation beads exist only where there is mist, never as permanent dirt.',
-'  vec2 microP = uv * uBuf / 3.2;',
-'  vec2 microCell = floor(microP);',
-'  vec2 microOffset = vec2(hash21(microCell), hash21(microCell + 37.1));',
-'  vec2 microLocal = fract(microP) - (0.35 + microOffset * 0.30);',
-'  float microR = 0.10 + 0.16 * clamp(d, 0.0, 1.0);',
-'  float microLens = 1.0 - smoothstep(microR * 0.45, microR, length(microLocal));',
-'  float microShine = 1.0 - smoothstep(0.0, microR * 0.65, length(microLocal + vec2(microR * 0.24)));',
-'  col += (microShine * 0.036 - microLens * 0.006) * smoothstep(0.04, 0.55, d) * uMist;',
-'',
-'  /* 水珠：透镜内折射 + 球面高光 */',
-'  float dsp = pow(max(0.0, dot(normalize(dg + vec2(0.0001)), ldir)), 5.0);',
-'  col += vec3(0.72, 0.80, 0.95) * dv * 0.10;',
-'  col += vec3(0.95, 0.97, 1.00) * dv * dsp * 0.50;',
-'',
-'  /* --- 玻璃窗户质感 --- */',
-'  /* 1) 宽窄两道斜向环境反光：光滑表面映出的天空与室内光 */',
-'  float rA = 1.0 - smoothstep(0.0, 0.11, abs((uv.x * 0.72 + uv.y * 0.70) - 0.80));',
-'  float rB = 1.0 - smoothstep(0.0, 0.045, abs((uv.x * 0.50 - uv.y * 0.88) + 0.12));',
-'  col += vec3(0.50, 0.60, 0.76) * rA * rA * 0.050 * (0.45 + 0.55 * wet);',
-'  col += vec3(0.40, 0.50, 0.68) * rB * rB * 0.030;',
-'',
-'  /* 2) 中空双层玻璃：亮部带一道轻微错位的重影 */',
-'  vec3 ghost = texture2D(uBg0, buv + vec2(0.007, -0.005)).rgb;',
-'  col += ghost * smoothstep(0.22, 0.85, dot(ghost, vec3(0.33))) * 0.050 * mix(1.0, 1.0 - smoothstep(0.03, 0.35, d), uMist);',
-'',
-'  /* 3) 表面灰迹 / 擦拭弧痕 / 灰尘：擦开雾气后依然存在的那层脏 */',
-'  float smudge = gsv.r;',
-'  col = mix(col, col * vec3(0.93, 0.95, 1.00) + vec3(0.020, 0.024, 0.030), smudge * mix(0.60, 0.30, uPolish) * (1.0 - uMist));',
-'  col += vec3(0.62, 0.74, 0.90) * gsv.g * 0.055 * (1.0 - uMist);',
-'  col += vec3(0.75, 0.82, 0.95) * gsv.b * 0.12 * (1.0 - uMist);',
-'',
-'  /* 4) 窗框内侧：边缘压暗 + 一道接光内倒角，读作真实窗格 */',
-'  vec2 qq = abs(uv - 0.5) * 2.0;',
-'  float outer = max(qq.x, qq.y);',
-'  col *= 1.0 - 0.35 * smoothstep(0.90, 1.0, outer);',
-'  float bevel = smoothstep(0.87, 0.90, outer) * (1.0 - smoothstep(0.90, 0.95, outer));',
-'  col += vec3(0.45, 0.55, 0.70) * bevel * 0.050;',
-'',
-'  /* 5) 冷边凝结：靠窗框处水汽更厚、微珠更亮 */',
-'  float nearFrame = smoothstep(0.60, 0.95, outer);',
-'  col += vec3(0.80, 0.87, 1.00) * beads * nearFrame * 0.060 * mix(1.0, 0.35, uMist);',
-'',
-'  /* 胶片颗粒 + 暗角 + 轻微反差 */',
-'  float fn = hash21(uv * uBuf + vec2(fract(uTime * 17.0), fract(uTime * 9.0)) * 97.0) - 0.5;',
-'  col += fn * mix(0.020, 0.012, uPolish) * mix(1.0, 0.25, uMist);',
-'',
-'  float vig = 1.0 - smoothstep(0.42, 1.30, length((uv - vec2(0.5, 0.47)) * vec2(1.02, 1.0) * 1.6));',
-'  col *= mix(mix(0.52, 0.65, uPolish), 1.0, vig);',
-'',
-'  col = clamp((col - 0.5) * mix(1.05, 1.025, uPolish) + 0.5, 0.0, 1.0);',
-'  gl_FragColor = vec4(col, 1.0);',
+'  float vig = smoothstep(0.55, 1.35, length((uv - 0.5) * vec2(1.4, 1.25)));',
+'  col *= 1.0 - 0.10 * vig;',
+'  col += (hash21(gl_FragCoord.xy + fract(uTime * 7.0) * 61.0) - 0.5) * 0.008;',
+'  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);',
+'}'
+].join('\n');
+
+/* 内侧水珠：每颗一个小四边形，按真实屏幕分辨率画出泪滴形透镜 */
+var DROP_VS = [
+'attribute vec2 aCorner;',
+'attribute vec4 aDrop;',
+'attribute vec2 aDir;',
+'uniform vec2 uCss;',
+'varying vec2 vLocal;',
+'varying vec2 vU;',
+'varying vec2 vShape;',
+'void main() {',
+'  vec2 u = aDir, v = vec2(-u.y, u.x);',
+'  float r = aDrop.z, T = aDrop.w;',
+'  float a = aCorner.x > 0.0 ? r * 1.25 : -(r * 1.25 + T);',
+'  float b = aCorner.y * r * 1.25;',
+'  vec2 p = aDrop.xy + u * a + v * b;',
+'  vLocal = vec2(a, b); vU = u; vShape = vec2(r, T);',
+'  gl_Position = vec4(p.x / uCss.x * 2.0 - 1.0, 1.0 - p.y / uCss.y * 2.0, 0.0, 1.0);',
+'}'
+].join('\n');
+
+var DROP_FS = [
+'#ifdef GL_FRAGMENT_PRECISION_HIGH',
+'precision highp float;',
+'#else',
+'precision mediump float;',
+'#endif',
+'uniform sampler2D uBg0;',
+'uniform sampler2D uBg1;',
+'uniform sampler2D uBg2;',
+'uniform vec2 uBuf;',
+'uniform vec2 uCss;',
+'varying vec2 vLocal;',
+'varying vec2 vU;',
+'varying vec2 vShape;',
+'const vec2 LDIR = vec2(-0.479, -0.878);',
+'/* x = 归一化距离（1 = 边缘），y = 该处水珠高度（css px） */',
+'vec2 shape(vec2 l) {',
+'  float r = vShape.x, T = vShape.y, q, w = r;',
+'  if (l.x >= 0.0 || T < 0.01) {',
+'    q = length(vec2(l.x * (l.x > 0.0 ? 1.04 : 0.97), l.y)) / r;',
+'  } else {',
+'    float t = clamp(-l.x / T, 0.0, 1.0);',
+'    w = r * (1.0 - 0.62 * pow(t, 0.85));',
+'    q = -l.x <= T ? abs(l.y) / w : length(vec2(-l.x - T, l.y)) / w;',
+'  }',
+'  return vec2(q, 0.62 * w * sqrt(max(0.0, 1.0 - q * q)));',
+'}',
+'void main() {',
+'  vec2 s = shape(vLocal);',
+'  float r = vShape.x, dpr = uBuf.x / uCss.x;',
+'  float aa = clamp(1.4 / (r * dpr), 0.03, 0.6);',
+'  float cov = 1.0 - smoothstep(1.0 - aa, 1.0, s.x);',
+'  if (cov <= 0.0) discard;',
+'  float e = 0.35;',
+'  float ga = (shape(vLocal + vec2(e, 0.0)).y - s.y) / e;',
+'  float gb = (shape(vLocal + vec2(0.0, e)).y - s.y) / e;',
+'  vec2 v = vec2(-vU.y, vU.x);',
+'  vec2 g = vU * ga + v * gb;',
+'  float glen = min(length(g), 3.0);',
+'  vec2 gd = g / max(length(g), 0.0001);',
+'  vec2 uv = vec2(gl_FragCoord.x / uBuf.x, 1.0 - gl_FragCoord.y / uBuf.y);',
+'  /* 透镜：倒着映出窗外，越靠边越弯 */',
+'  vec2 luv = uv + gd * glen * r * 0.55 / uCss;',
+'  /* 小水珠只看得到一团柔和的亮光，大水珠才映得出清楚的倒影 */',
+'  float sharp = smoothstep(1.8, 6.0, r);',
+'  vec3 soft = texture2D(uBg2, luv).rgb;',
+'  soft = soft * 0.82 + 0.12 + max(soft - 0.5, vec3(0.0)) * 0.3;',
+'  vec3 col = mix(soft, mix(texture2D(uBg0, luv).rgb, texture2D(uBg1, luv).rgb, 0.25), sharp);',
+'  float rim = smoothstep(0.60, 1.0, s.x);',
+'  col *= 1.0 - (0.22 + 0.33 * sharp) * rim;',
+'  col += vec3(0.05, 0.055, 0.06) * rim;',
+'  vec2 off = (vU * vLocal.x + v * vLocal.y) / r;',
+'  float spec = pow(max(0.0, dot(-gd, LDIR)), 14.0) * smoothstep(0.45, 0.85, s.x) * (1.0 - smoothstep(0.92, 1.0, s.x));',
+'  float spot = exp(-dot(off - LDIR * 0.40, off - LDIR * 0.40) * 38.0);',
+'  float caustic = exp(-dot(off + LDIR * 0.40, off + LDIR * 0.40) * 7.0) * (1.0 - rim);',
+'  col += vec3(1.0) * (spec * 0.50 + spot * 0.75);',
+'  col += (col + 0.08) * caustic * 0.30;',
+'  gl_FragColor = vec4(clamp(col, 0.0, 1.0) * cov, cov);',
 '}'
 ].join('\n');
 
@@ -1652,12 +1750,47 @@ function makeGrainCanvas() {
 }
 
 var grainBase = null;
+/* 水珠图块（可平铺）：每个像素记下离它最近那颗珠子的相对位置和出现门槛。
+   R = 门槛（雾/残留水量超过它才显出这颗珠子），GB = 相对珠心的位置 / 半径 / 1.5。
+   大珠子门槛低：雾散时小珠先消失，大珠多挂一会儿。 */
+function makeBeadTile(seed, cell, rMin, rMax) {
+  var N = 512, cv = mkCanvas(N, N), c2 = cv.getContext('2d');
+  var id = c2.createImageData(N, N), d = id.data, best = new Float32Array(N * N), rnd = rng32(seed);
+  var i, x, y;
+  for (i = 0; i < N * N; i++) { best[i] = 1.3; d[i * 4] = 0; d[i * 4 + 1] = 255; d[i * 4 + 2] = 255; d[i * 4 + 3] = 255; }
+  var cells = N / cell;
+  for (var cy = 0; cy < cells; cy++) for (var cx = 0; cx < cells; cx++) {
+    if (rnd() < 0.28) continue;
+    var sz = Math.pow(rnd(), 2.2);
+    var r = rMin + (rMax - rMin) * sz;
+    var bx = (cx + 0.5 + (rnd() - 0.5) * 0.62) * cell, by = (cy + 0.5 + (rnd() - 0.5) * 0.62) * cell;
+    var th = clamp(0.10 + 0.82 * rnd() - 0.28 * sz, 0.04, 0.98);
+    var ext = Math.ceil(r * 1.3) + 1;
+    for (y = -ext; y <= ext; y++) for (x = -ext; x <= ext; x++) {
+      var px = Math.floor(bx) + x, py = Math.floor(by) + y;
+      var ox = (px + 0.5 - bx) / r, oy = (py + 0.5 - by) / r, q = Math.sqrt(ox * ox + oy * oy);
+      var wx = ((px % N) + N) % N, wy = ((py % N) + N) % N, k = wy * N + wx;
+      if (q >= best[k]) continue;
+      best[k] = q;
+      var o = k * 4;
+      d[o] = th * 255;
+      d[o + 1] = (0.5 + ox / 3) * 255;
+      d[o + 2] = (0.5 + oy / 3) * 255;
+    }
+  }
+  c2.putImageData(id, 0, 0);
+  return cv;
+}
+var beadFine = null, beadCoarse = null;
 function makeGrainAtlas() {
   if (!grainBase) grainBase = makeGrainCanvas();
-  var atlas = mkCanvas(1024, 512), c2 = atlas.getContext('2d');
+  if (!beadFine) { beadFine = makeBeadTile(515, 8, 1.5, 2.4); beadCoarse = makeBeadTile(919, 16, 1.8, 4.6); }
+  var atlas = mkCanvas(1024, 1024), c2 = atlas.getContext('2d');
   c2.drawImage(grainBase, 0, 0);
   c2.fillStyle = '#000'; c2.fillRect(512, 0, 512, 512);
   if (BG.glass) c2.drawImage(BG.glass, 512, 0, 512, 512);
+  c2.drawImage(beadFine, 0, 512);
+  c2.drawImage(beadCoarse, 512, 512);
   return atlas;
 }
 
@@ -1701,7 +1834,7 @@ function initGL() {
   gl.useProgram(prog);
 
   var quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
-  var vbo = gl.createBuffer();
+  var vbo = quadVbo = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
   gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
@@ -1709,7 +1842,7 @@ function initGL() {
 
   U = {
     fog: gl.getUniformLocation(prog, 'uFog'),
-    drop: gl.getUniformLocation(prog, 'uDrop'),
+    dpr: gl.getUniformLocation(prog, 'uDpr'),
     bg0: gl.getUniformLocation(prog, 'uBg0'),
     bg1: gl.getUniformLocation(prog, 'uBg1'),
     bg2: gl.getUniformLocation(prog, 'uBg2'),
@@ -1729,7 +1862,6 @@ function initGL() {
     fogTint: gl.getUniformLocation(prog, 'uFogTint')
   };
   gl.uniform1i(U.fog, 0);
-  gl.uniform1i(U.drop, 1);
   gl.uniform1i(U.bg0, 2);
   gl.uniform1i(U.bg1, 3);
   gl.uniform1i(U.bg2, 4);
@@ -1737,7 +1869,6 @@ function initGL() {
   gl.uniform1i(U.rain, 6);
 
   fogTex = gl.createTexture();
-  dropTex = gl.createTexture();
   grainTex = gl.createTexture();
   rainTex = gl.createTexture();
   /* 每个纹理必须绑定到着色器声明的纹理单元，否则采样为空 */
@@ -1745,8 +1876,73 @@ function initGL() {
   texFromCanvas(grainTex, makeGrainAtlas(), false);
   gl.activeTexture(gl.TEXTURE0);
 
+  if (!initDropProgram()) return false;
   glass.addEventListener('webglcontextlost', onContextLost, false);
   return true;
+}
+
+var quadVbo = null, dprog = null, DU = null, dropVbo = null, dropVerts = null;
+function initDropProgram() {
+  var vs = compileShader(gl.VERTEX_SHADER, DROP_VS);
+  var fs = compileShader(gl.FRAGMENT_SHADER, DROP_FS);
+  if (!vs || !fs) return false;
+  dprog = gl.createProgram();
+  gl.attachShader(dprog, vs); gl.attachShader(dprog, fs);
+  gl.bindAttribLocation(dprog, 0, 'aCorner');
+  gl.bindAttribLocation(dprog, 1, 'aDrop');
+  gl.bindAttribLocation(dprog, 2, 'aDir');
+  gl.linkProgram(dprog);
+  if (!gl.getProgramParameter(dprog, gl.LINK_STATUS)) return false;
+  gl.useProgram(dprog);
+  DU = { css: gl.getUniformLocation(dprog, 'uCss'), buf: gl.getUniformLocation(dprog, 'uBuf') };
+  gl.uniform1i(gl.getUniformLocation(dprog, 'uBg0'), 2);
+  gl.uniform1i(gl.getUniformLocation(dprog, 'uBg1'), 3);
+  gl.uniform1i(gl.getUniformLocation(dprog, 'uBg2'), 4);
+  dropVbo = gl.createBuffer();
+  dropVerts = new Float32Array(DROP_CAP * 6 * 8);
+  gl.useProgram(prog);
+  return true;
+}
+
+var CORNERS = [-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1];
+function renderDrops() {
+  var n = 0, i, k, v = dropVerts, inv = 1 / Math.max(0.02, densityScale);
+  for (i = 0; i < drops.length && n < DROP_CAP; i++) {
+    var d = drops[i], r = d.r * inv;
+    if (r < 0.45) continue;
+    var ux = 0, uy = 1, T = 0;
+    if (d.slide) {
+      var sp = Math.sqrt(d.vx * d.vx + d.vy * d.vy);
+      if (sp > 0.001) { ux = d.vx / sp; uy = d.vy / sp; }
+      T = r * (0.25 + 2.1 * clamp(d.vy / Math.max(0.001, d.maxV), 0, 1)) * (0.6 + 0.4 * d.seed);
+    }
+    var cx = d.x * inv, cy = d.y * inv;
+    for (k = 0; k < 6; k++) {
+      var o = (n * 6 + k) * 8;
+      v[o] = CORNERS[k * 2]; v[o + 1] = CORNERS[k * 2 + 1];
+      v[o + 2] = cx; v[o + 3] = cy; v[o + 4] = r; v[o + 5] = T;
+      v[o + 6] = ux; v[o + 7] = uy;
+    }
+    n++;
+  }
+  if (!n) return;
+  gl.useProgram(dprog);
+  gl.uniform2f(DU.css, S.cssW, S.cssH);
+  gl.uniform2f(DU.buf, S.bufW, S.bufH);
+  gl.bindBuffer(gl.ARRAY_BUFFER, dropVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, v.subarray(0, n * 48), gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(1); gl.enableVertexAttribArray(2);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 32, 0);
+  gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 8);
+  gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 32, 24);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.drawArrays(gl.TRIANGLES, 0, n * 6);
+  gl.disable(gl.BLEND);
+  gl.disableVertexAttribArray(1); gl.disableVertexAttribArray(2);
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadVbo);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.useProgram(prog);
 }
 
 function onContextLost(e) {
@@ -1795,7 +1991,8 @@ function buildBackground() {
     if (Sc.image || Sc.preview) {
       source = mkCanvas(tw, th);
       var photoCtx = source.getContext('2d');
-      if (hasFilter(photoCtx)) photoCtx.filter = 'saturate(' + Sc.saturation + ') contrast(0.94)';
+      /* 照片基本保持原色，只收一点点饱和，不再整体发灰 */
+      if (hasFilter(photoCtx)) photoCtx.filter = 'saturate(' + Math.min(1, Sc.saturation + 0.24).toFixed(2) + ')';
       drawCover(photoCtx, Sc.image || Sc.preview, tw, th, Sc.focus);
       photoCtx.filter = 'none';
     } else if (Sc.failed) source = Sc.make(tw, th, Sc.seed);
@@ -1856,25 +2053,15 @@ function uploadSimTextures() {
   if (!useGL || !gl || !fogTex) return;
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, fogTex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0);
+  if (!fogU8 || fogU8.buffer !== fogBuf.buffer) fogU8 = new Uint8Array(fogBuf.buffer, fogBuf.byteOffset, fogBuf.length);
   if (!fogTexReady) {
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fogCanvas);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, dw, dh, 0, gl.RGBA, gl.UNSIGNED_BYTE, fogU8);
     setTexParams(fogTex, false);
     fogTexReady = true;
   } else {
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, fogCanvas);
-  }
-  gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, dropTex);
-  if (!dropTexReady) {
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, dropCanvas);
-    setTexParams(dropTex, false);
-    dropTexReady = true;
-  } else {
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, dropCanvas);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, dw, dh, gl.RGBA, gl.UNSIGNED_BYTE, fogU8);
   }
 }
 
@@ -1884,6 +2071,7 @@ var tmpC = null, tmpCtx = null;
 function renderGL(t) {
   gl.viewport(0, 0, S.bufW, S.bufH);
   gl.useProgram(prog);
+  gl.uniform1f(U.dpr, S.bufW / Math.max(1, S.cssW));
   gl.uniform2f(U.texel, 1 / Math.max(1, dw), 1 / Math.max(1, dh));
   gl.uniform2f(U.buf, S.bufW, S.bufH);
   gl.uniform2f(U.rainTexel, 1 / Math.max(1, rw), 1 / Math.max(1, rh));
@@ -1897,6 +2085,7 @@ function renderGL(t) {
   gl.uniform1f(U.mist, softMist ? 1 : 0);
   gl.uniform3fv(U.fogTint, S.customImg ? [0.90, 0.91, 0.91] : SCENES[S.sceneIndex].tint);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+  renderDrops();
 }
 
 function flightScene() { return S.windowStyle === 4 && !S.customImg && SCENES[S.sceneIndex].flight; }
@@ -1923,13 +2112,13 @@ function renderFlat(t) {
     drawFlatBackground(tmpCtx, BG.blurB, t, W, H);
     if (softMist) {
       var tint = S.customImg ? [0.90, 0.91, 0.91] : SCENES[S.sceneIndex].tint;
-      tmpCtx.fillStyle = 'rgba(' + Math.round(tint[0]*196) + ',' + Math.round(tint[1]*196) + ',' + Math.round(tint[2]*196) + ',0.40)';
+      tmpCtx.fillStyle = 'rgba(' + Math.round(tint[0]*240) + ',' + Math.round(tint[1]*240) + ',' + Math.round(tint[2]*240) + ',0.46)';
       tmpCtx.fillRect(0, 0, W, H);
     }
     tmpCtx.globalCompositeOperation = 'destination-in';
     tmpCtx.drawImage(fogCanvas, 0, 0, W, H);
     tmpCtx.globalCompositeOperation = 'source-over';
-    c2.save(); c2.globalAlpha = 0.92; c2.drawImage(tmpC, 0, 0); c2.restore();
+    c2.save(); c2.globalAlpha = 0.97; c2.drawImage(tmpC, 0, 0); c2.restore();
   }
   /* 简化模式下叠加表面灰迹与灰尘 */
   if (BG.glass) {
@@ -1965,12 +2154,24 @@ function renderFlat(t) {
     var d = drops[i];
     var px = d.x / dw * W, py = d.y / dh * H, R = d.r / dw * W;
     if (R < 0.8) continue;
-    var g = c2.createRadialGradient(px - R * 0.25, py - R * 0.3, R * 0.05, px, py, R);
-    g.addColorStop(0, 'rgba(235,244,255,0.55)');
-    g.addColorStop(0.55, 'rgba(160,190,225,0.20)');
-    g.addColorStop(1, 'rgba(120,150,190,0)');
-    c2.fillStyle = g;
-    c2.beginPath(); c2.arc(px, py, R, 0, Math.PI * 2); c2.fill();
+    var tail = d.slide ? R * (0.3 + 2.0 * clamp(d.vy / Math.max(0.001, d.maxV), 0, 1)) : 0;
+    c2.save();
+    c2.beginPath();
+    c2.moveTo(px - R, py);
+    c2.arc(px, py, R, Math.PI, 0, true);
+    if (tail > 0.5) c2.quadraticCurveTo(px + R * 0.5, py - tail * 0.6, px, py - R - tail);
+    if (tail > 0.5) c2.quadraticCurveTo(px - R * 0.5, py - tail * 0.6, px - R, py);
+    else c2.arc(px, py, R, 0, Math.PI, true);
+    c2.closePath();
+    var g = c2.createLinearGradient(px, py - R - tail, px, py + R);
+    g.addColorStop(0, 'rgba(40,50,60,0.10)');
+    g.addColorStop(0.7, 'rgba(255,255,255,0.10)');
+    g.addColorStop(1, 'rgba(255,255,255,0.32)');
+    c2.fillStyle = g; c2.fill();
+    c2.strokeStyle = 'rgba(30,38,46,0.28)'; c2.lineWidth = Math.max(0.8, R * 0.18); c2.stroke();
+    c2.fillStyle = 'rgba(255,255,255,0.85)';
+    c2.beginPath(); c2.arc(px - R * 0.35, py - R * 0.4, Math.max(0.6, R * 0.18), 0, Math.PI * 2); c2.fill();
+    c2.restore();
   }
 }
 
@@ -2088,11 +2289,17 @@ function fakePointerMove(cx, cy) {
     if (fogF) {
       var R = brushRadius() * densityScale;
       var p = wipeSegment(S.lastX * dw, S.lastY * dh, nx * dw, ny * dh, R);
+      wipeDrops(S.lastX * dw, S.lastY * dh, nx * dw, ny * dh, R);
       strokeDist += dist * densityScale;
-      /* 湿笔迹偶尔聚成小水珠下滑 */
-      if (p && strokeDist > 45 && wetF[p.i] > 0.3 && Math.random() < 0.4) {
-        spawnDrop(p.x, p.y, 1.6 + Math.random() * 4.0, 7 + Math.random() * 7);
+      /* 被推到笔画下沿的水，过一会儿聚成水珠；横着写的笔画更容易挂珠 */
+      if (p && strokeDist > R * 3.2) {
         strokeDist = 0;
+        var horiz = Math.abs(dx) / Math.max(0.001, dist);
+        var ex = p.x + (Math.random() - 0.5) * R * 0.6, ey = p.y + R * (1.0 + Math.random() * 0.15);
+        if (Math.random() < 0.16 + 0.42 * horiz && fogAt(ex, ey + R * 0.3) > 0.28) {
+          var sd = spawnDrop(ex, ey, dropCritical() * (0.62 + 0.46 * Math.random()), true);
+          if (sd) sd.gk *= 2.2;
+        }
       }
       hideHint();
     }
@@ -2142,6 +2349,8 @@ function bindInput() {
     stage.addEventListener('pointermove', function (e) {
       var nx = clamp(e.clientX / Math.max(1, S.cssW), 0, 1);
       var ny = clamp(e.clientY / Math.max(1, S.cssH), 0, 1);
+      S.hoverGlass = !targetInDock(e.target);
+      if (e.pointerType) S.pointerType = e.pointerType;
       if (!S.down) {
         S.lastPointer.x = nx; S.lastPointer.y = ny; S.lastPointer.t = S.time;
         return;
@@ -2167,6 +2376,7 @@ function bindInput() {
     stage.addEventListener('pointercancel', up, false);
     stage.addEventListener('lostpointercapture', up, false);
     stage.addEventListener('pointerleave', function (e) {
+      S.hoverGlass = false;
       if (e.pointerType === 'mouse') up(e);
     }, false);
   } else {
@@ -2285,6 +2495,44 @@ function nextWindow() {
   showLabel(S.windowStyle === 4 ? '飞机舷窗' : S.windowStyle === 2 ? '火车窗' : '无框玻璃');
 }
 
+/* ---------------------------------------------------------------- 手势反馈 */
+var ringShown = -1, ringBurst = 0, wasHold = false, writingOn = false, cursorOn = false, cursorKey = '';
+var finePointer = !!(window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches);
+function updateGestureUI(dt) {
+  var hold = S.down && S.mode === 'hold';
+  if (hold && !wasHold) ringBurst = 1;
+  wasHold = hold;
+  var p = 0, scale = 1, op = 0;
+  if (S.down && !S.tapMoved && S.mode !== 'hold' && MIST_WINDOWS.contains(aperture, S.lastX * S.cssW, S.lastY * S.cssH)) {
+    p = clamp((S.time - S.downT - 0.22) / 0.50, 0, 1);
+    scale = 1.35 - 0.6 * p; op = p * 0.85;
+  }
+  if (ringBurst > 0) {
+    ringBurst = Math.max(0, ringBurst - dt * 2.2);
+    scale = 0.75 + (1 - ringBurst) * 0.9; op = ringBurst * 0.7;
+  }
+  var key = op < 0.01 ? 0 : op.toFixed(3) + scale.toFixed(3) + S.lastX.toFixed(4) + S.lastY.toFixed(4);
+  if (key !== ringShown) {
+    ringShown = key;
+    ringEl.style.opacity = op < 0.01 ? '0' : op.toFixed(3);
+    if (op >= 0.01) ringEl.style.transform = 'translate3d(' + (S.lastX * S.cssW).toFixed(1) + 'px,' + (S.lastY * S.cssH).toFixed(1) + 'px,0) scale(' + scale.toFixed(3) + ')';
+  }
+  var writing = S.down && S.tapMoved;
+  if (writing !== writingOn) { writingOn = writing; document.body.classList.toggle('writing', writing); }
+  /* 桌面：鼠标在玻璃上时显示笔刷大小 */
+  var lx = S.lastPointer.x * S.cssW, ly = S.lastPointer.y * S.cssH;
+  var showCursor = finePointer && S.pointerType === 'mouse' && S.hoverGlass && MIST_WINDOWS.contains(aperture, lx, ly) && !MIST_WINDOWS.state().dragging;
+  if (showCursor !== cursorOn) { cursorOn = showCursor; cursorEl.style.opacity = showCursor ? '1' : '0'; document.body.classList.toggle('cursor-glass', showCursor); }
+  if (showCursor) {
+    var r = brushRadius(), ck = lx.toFixed(1) + ',' + ly.toFixed(1) + ',' + r;
+    if (ck !== cursorKey) {
+      cursorKey = ck;
+      cursorEl.style.width = cursorEl.style.height = (r * 2) + 'px';
+      cursorEl.style.transform = 'translate3d(' + (lx - r).toFixed(1) + 'px,' + (ly - r).toFixed(1) + 'px,0)' + (S.mode === 'hold' && S.down ? ' scale(1.6)' : '');
+    }
+  }
+}
+
 /* ================================================================ 主循环 */
 var lastT = 0, perfAcc = 0, perfCnt = 0, adapted = false;
 var qaFrames = [], qaCpu = [], qaTicks = 0;
@@ -2299,7 +2547,8 @@ if (debugMode) window.__mist = {
       inputMode: S.mode, down: S.down, breath: S.breathLevel, fog: fogSum / Math.max(1, flen),
       centerFog: fogF ? fogF[centre] : 0, grid: [dw, dh], dpr: S.dpr, drops: drops.length,
       aperture: aperture ? [aperture.x, aperture.y, aperture.w, aperture.h] : null,
-      shade: MIST_WINDOWS.state(), flight: flightScene(), samplers: useGL ? 7 : 0, error: window.__dbgErr, look: originalLook ? 'original' : softMist ? 'soft-mist' : 'previous' };
+      shade: MIST_WINDOWS.state(), flight: flightScene(), samplers: useGL ? 7 : 0, error: window.__dbgErr, look: originalLook ? 'original' : softMist ? 'soft-mist' : 'previous',
+      sliding: drops.filter(function (d) { return d.slide; }).length, maxDropCss: drops.reduce(function (m, d) { return Math.max(m, d.r / densityScale); }, 0), residual: (function () { var t = 0; for (var i = 0; i < flen; i += 7) t += resF[i]; return t / Math.ceil(flen / 7); })() };
   }
 };
 
@@ -2320,9 +2569,11 @@ function frame(t) {
 
     updateHoldCheck();
     updateBreath(dt);
+    updateGestureUI(dt);
 
     var m = MELT[S.melt] || MELT[1];
     if (fogF) {
+      introFog(dt);
       applyBreath(dt, f);
       updateDrops(dt);
       mergeDrops();
@@ -2330,7 +2581,6 @@ function frame(t) {
       fogSum = relaxFog(f * MELT_TIME, m);
       diffuseFog(0.030 * m.df, f * MELT_TIME);
       writeFogCanvas();
-      writeDropCanvas();
       uploadSimTextures();
     }
     updateRain(dt);
@@ -2403,6 +2653,8 @@ function bindDom() {
   hintEl = document.getElementById('hint');
   labelEl = document.getElementById('label');
   toastEl = document.getElementById('toast');
+  ringEl = document.getElementById('ring');
+  cursorEl = document.getElementById('cursor');
   btnSave = document.getElementById('btnSave');
   btnMelt = document.getElementById('btnMelt');
   btnScene = document.getElementById('btnScene');
