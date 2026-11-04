@@ -2035,7 +2035,11 @@ function updateBreath(dt) {
 function brushRadius() {
   var m = Math.min(S.cssW, S.cssH);
   /* 笔宽按书写调校：中心一擦即清，外缘仍留潮湿痕迹 */
-  if (S.pointerType === 'touch') return clamp(m * 0.04, 15, 26);
+  if (S.pointerType === 'touch') {
+    // Match the writing area, not the finger's contact patch. Keep mouse input unchanged.
+    var paneSize = aperture && aperture.type ? Math.min(aperture.w, aperture.h) : m;
+    return clamp(paneSize * 0.023, 5, 8.5);
+  }
   return clamp(m * 0.017, 12, 22);
 }
 
@@ -2251,12 +2255,17 @@ function showLabel(msg) {
   labelTimer = setTimeout(function () { labelEl.style.opacity = '0'; }, 1600);
 }
 
+function clearLabel() {
+  if (labelTimer) clearTimeout(labelTimer);
+  labelTimer = null; labelEl.textContent = ''; labelEl.style.opacity = '0';
+}
+
 function selectScene(index) {
   S.sceneIndex = index;
   S.customImg = null;
   loadScene(index);
   buildBackground();
-  showLabel(SCENES[index].name);
+  clearLabel();
   loadScene((index + 1) % SCENES.length);
   hideHint();
 }
@@ -2431,7 +2440,7 @@ function bindButtons() {
         try {
           S.customImg = img;
           buildBackground();
-          showLabel('自定义照片');
+          clearLabel();
         } catch (err) { throw makeDiagError('BG_UPLOAD', err); }
         try { URL.revokeObjectURL(url); } catch (e) {}
       };

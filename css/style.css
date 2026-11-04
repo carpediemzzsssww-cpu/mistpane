@@ -5,11 +5,10 @@ body {
   position:fixed; left:0; top:0; right:0; bottom:0;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
   -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; touch-action:none; overscroll-behavior:none;
-  --ui-text:#e1e3dc; --ui-muted:#c0c6be; --ui-surface:#343c3b; --ui-border:rgba(0,0,0,.4);
-  --key-top:#505954; --key-bottom:#373f3b; --key-light:rgba(255,255,255,.16); --tray-top:#303936; --tray-bottom:#202925;
+  --ui-text:#e7ece9; --ui-muted:#bbc5bf; --ui-surface:rgba(24,31,30,.82); --ui-border:rgba(235,244,237,.13); --press:rgba(242,248,242,.10);
 }
-body[data-window="2"],body[data-window="4"] { --ui-text:#50574f; --ui-muted:#72776d; --ui-surface:#e5e5dd; --ui-border:rgba(83,86,71,.26); --key-top:#faf9f3; --key-bottom:#e4e3d9; --key-light:rgba(255,255,255,.94); --tray-top:#ddded4; --tray-bottom:#e9e9e0; }
-body.cabin-dark { --ui-text:#d9ddd4; --ui-muted:#b7c0b5; --ui-surface:#343c3b; --ui-border:rgba(0,0,0,.4); --key-top:#505954; --key-bottom:#373f3b; --key-light:rgba(255,255,255,.16); --tray-top:#303936; --tray-bottom:#202925; }
+body[data-window="2"],body[data-window="4"] { --ui-text:#465049; --ui-muted:#69746b; --ui-surface:rgba(249,250,246,.80); --ui-border:rgba(255,255,255,.66); --press:rgba(49,68,53,.07); }
+body.cabin-dark { --ui-text:#e7ece9; --ui-muted:#bbc5bf; --ui-surface:rgba(24,31,30,.82); --ui-border:rgba(235,244,237,.13); --press:rgba(242,248,242,.10); }
 #stage,#glass,#flat,#windowFrame { position:absolute; left:0; top:0; width:100%; height:100%; }
 #stage { overflow:hidden; touch-action:none; }
 #glass,#flat { display:block; touch-action:none; }
@@ -24,18 +23,17 @@ body.cabin-dark { --ui-text:#d9ddd4; --ui-muted:#b7c0b5; --ui-surface:#343c3b; -
 #hint b { display:block; font-size:11px; font-weight:400; color:rgba(234,242,238,.67); letter-spacing:.03em; }
 #label { position:absolute; left:0; right:0; top:6%; text-align:center; padding:0 16px; pointer-events:none; font-size:12px; letter-spacing:.18em; color:var(--ui-muted); text-shadow:0 1px 10px rgba(0,0,0,.10); opacity:0; transition:opacity .18s; }
 #toast { position:absolute; left:50%; bottom:116px; bottom:calc(116px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:280px; max-width:84%; text-align:center; pointer-events:none; font-size:12px; line-height:1.7; padding:10px 16px; color:var(--ui-text); background:var(--ui-surface); border:1px solid var(--ui-border); border-radius:16px; box-shadow:0 6px 24px rgba(18,25,20,.10); opacity:0; transition:opacity .2s; }
-/* Six small moulded keys in one recessed rail. */
+/* One quiet toolbar: shared surface, fine icons, generous touch targets. */
 #controls { position:absolute; left:50%; bottom:18px; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:344px; max-width:calc(100% - 20px); pointer-events:none; }
 button { -webkit-appearance:none; appearance:none; font:inherit; cursor:pointer; touch-action:manipulation; }
-#dock { display:flex; align-items:center; padding:7px 6px 4px; border-radius:20px; border:1px solid var(--ui-border); background:linear-gradient(175deg,var(--tray-top),var(--tray-bottom)); box-shadow:inset 0 1px 2px rgba(53,57,45,.12),0 1px 0 var(--key-light),0 8px 20px rgba(27,31,22,.10); pointer-events:auto; }
-.btn { position:relative; display:flex; flex:1; flex-direction:column; align-items:center; justify-content:flex-start; min-width:44px; height:62px; padding:8px 0 0; margin:0 2px; border:0; background:transparent; color:var(--ui-text); outline:none; }
-.btn:before { content:""; position:absolute; top:0; left:0; right:0; height:41px; border:1px solid var(--ui-border); border-radius:12px; background:linear-gradient(165deg,var(--key-top),var(--key-bottom)); box-shadow:inset 0 1px 1px var(--key-light),inset 0 -1px 1px rgba(58,61,48,.09),0 2px 2px rgba(44,48,36,.19),0 3px 0 rgba(72,76,60,.11); transition:transform .1s,box-shadow .1s; }
-.btn span { position:relative; display:block; font-size:11px; line-height:14px; margin-top:13px; white-space:nowrap; letter-spacing:.04em; text-shadow:0 1px var(--key-light); }
-button svg { position:relative; width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.45; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; transition:transform .1s; filter:drop-shadow(0 1px 0 var(--key-light)); }
-.btn:active:before { transform:translateY(2px); box-shadow:inset 0 1px 3px rgba(44,48,36,.18),0 1px 0 var(--key-light); }
-.btn:active svg { transform:translateY(2px); }
+#dock { display:flex; align-items:center; padding:5px 6px; border-radius:24px; border:1px solid var(--ui-border); background:var(--ui-surface); box-shadow:0 4px 18px rgba(25,35,27,.07); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); pointer-events:auto; }
+.btn { display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; min-width:44px; height:54px; padding:4px 0; margin:0; border:0; border-radius:18px; background:transparent; color:var(--ui-text); outline:none; transition:background .16s,transform .12s; }
+.btn span { display:block; font-size:11px; line-height:16px; margin-top:4px; white-space:nowrap; letter-spacing:.01em; }
+button svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.btn:active { background:var(--press); transform:scale(.94); }
 .btn[aria-busy="true"] { opacity:.55; }
-button:focus-visible { outline:2px solid #879981; outline-offset:4px; border-radius:12px; }
+button:focus-visible { outline:2px solid #8ba084; outline-offset:2px; border-radius:14px; }
+@media (hover:hover) { .btn:hover { background:var(--press); } }
 #file { display:none; }
 /* The frozen mobile picture can be long-pressed using the browser's native menu. */
 #savePreview[hidden] { display:none; }
@@ -44,12 +42,12 @@ button:focus-visible { outline:2px solid #879981; outline-offset:4px; border-rad
 .save-card img { display:block; max-width:100%; width:auto; height:auto; min-height:0; max-height:calc(100vh - 180px); max-height:calc(100dvh - 180px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); object-fit:contain; border-radius:10px; -webkit-touch-callout:default; -webkit-user-select:auto; user-select:auto; touch-action:auto; }
 .save-card p { margin:12px 0 10px; font-size:12px; line-height:1.5; text-align:center; }
 .save-close { position:absolute; z-index:1; right:16px; top:16px; width:44px; height:44px; border:1px solid rgba(50,55,44,.2); border-radius:50%; background:#f2f2ea; color:#525b50; box-shadow:0 2px 8px rgba(0,0,0,.14); font-size:26px; }
-.save-action { height:44px; flex-shrink:0; min-width:140px; border:1px solid #b7bcae; border-radius:12px; background:linear-gradient(#fafbf5,#dedfd4); color:#495344; box-shadow:inset 0 1px 0 white,0 2px 2px rgba(40,50,35,.12); font-size:13px; }
+.save-action { height:44px; flex-shrink:0; min-width:140px; border:1px solid #b7bcae; border-radius:12px; background:#e4e9e1; color:#495344; box-shadow:none; font-size:13px; }
 .save-action:disabled { opacity:.5; }
 @media (max-height:500px) and (orientation:landscape) {
   #controls { left:auto; right:12px; right:calc(12px + env(safe-area-inset-right)); bottom:auto; top:50%; width:116px; max-width:none; transform:translateY(-50%); }
-  #dock { flex-wrap:wrap; padding:8px 6px 3px; border-radius:18px; }
-  .btn { flex:none; width:calc(50% - 4px); margin-bottom:5px; }
+  #dock { flex-wrap:wrap; padding:6px; border-radius:22px; }
+  .btn { flex:none; width:50%; height:54px; }
   #label { right:142px; }
   #hint b { display:none; }
   #toast { left:calc(50% - 71px); bottom:16px; max-width:50%; }
@@ -57,4 +55,4 @@ button:focus-visible { outline:2px solid #879981; outline-offset:4px; border-rad
   .save-card img { max-height:calc(100vh - 56px); max-height:calc(100dvh - 56px - env(safe-area-inset-bottom) - env(safe-area-inset-top)); max-width:65vw; }
   .save-card p { display:none; }.save-action { min-width:80px; margin-left:12px; }
 }
-@media (prefers-reduced-motion:reduce) { #hint,#toast,#label,button,.btn:before,button svg { transition:none !important; } }
+@media (prefers-reduced-motion:reduce) { #hint,#toast,#label,button { transition:none !important; } }
