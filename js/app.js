@@ -624,6 +624,11 @@ function loadScene(index) {
   scene.used = ++photoUse;
   if (scene.image || scene.loading || scene.failed) return;
   scene.loading = true;
+  if (!scene.preview) {
+    var preview = new Image();
+    preview.onload = function () { scene.preview = preview; if (S.sceneIndex === index && !S.customImg && !scene.image) buildBackground(); };
+    preview.src = scene.thumb;
+  }
   var image = new Image();
   image.onload = function () {
     scene.image = image; scene.loading = false;
@@ -631,7 +636,7 @@ function loadScene(index) {
     var cached = SCENES.filter(function (item) { return item.image && item !== SCENES[S.sceneIndex]; });
     cached.sort(function (a, b) { return b.used - a.used; });
     while (cached.length > 2) cached.pop().image = null;
-    if (S.sceneIndex === index && !S.customImg) buildBackground();
+    if (S.sceneIndex === index && !S.customImg) { buildBackground(); loadScene((index + 1) % SCENES.length); }
   };
   image.onerror = function () {
     scene.failed = true; scene.loading = false;
@@ -649,7 +654,7 @@ var S = {
   sceneIndex: Math.max(0, initialScene), customImg: null,
   micOn: false, micLevel: 0, micEnv: 0,
   micDriftX: 0, micDriftY: 0, micDriftT: 0, micDriftA: 0,
-  holdLevel: 0, holdX: 0, holdY: 0,
+  holdLevel: 0, holdX: 0, holdY: 0, manualHeld: false,
   space: false, spaceLevel: 0,
   breathLevel: 0, breathX: 0.5, breathY: 0.47, breathR: 0.16, sustain: 0,
   lastPointer: { x: 0.5, y: 0.47, t: 0 },
@@ -658,7 +663,7 @@ var S = {
   lastX: 0.5, lastY: 0.47, downX: 0.5, downY: 0.47,
   windowStyle: windowMatch && Number(windowMatch[1]) === 0 ? 0 : windowMatch && Number(windowMatch[1]) === 2 ? 2 : 4,
   rainAmt: 0, snowAmt: 0, melt: 1,
-  weather: 'clear', weatherLevel: 0, weatherHold: 0,
+  weather: 'clear', weatherLevel: 0,
   wind: 0, windTarget: 0, windT: 0,
   lastTapT: 0, lastTapX: 0.5, lastTapY: 0.47,
   time: 0
@@ -666,7 +671,7 @@ var S = {
 
 var frameCanvas, aperture = null;
 var stage, glass, flat, flatCtx, hintEl, labelEl, toastEl,
-    btnMic, btnScene, btnWeather, btnWindow, btnUpload, fileEl;
+    btnMic, btnBreath, btnMelt, btnScene, btnWeather, btnWindow, btnUpload, fileEl;
 var useGL = false, gl = null, prog = null, U = null;
 var fogTex = null, dropTex = null, grainTex = null;
 var fogTexReady = false, dropTexReady = false;
@@ -682,7 +687,6 @@ var MELT = [
 ];
 // Slow evaporation, wet-mark fading and edge refill together, independently of drops.
 var MELT_TIME = 0.80;
-var meltSegs = [];
 var toastTimer = null, labelTimer = null;
 var hintHidden = false;
 var strokeDist = 0;
@@ -705,7 +709,7 @@ var naturalAcc = 0;
 var rainDrops = [], rainAcc = 0;
 var snowFlakes = [], snowAcc = 0;
 var rainStreaks = [];
-var rainIntensity = 0.6, rainTarget = 0.6, rainIntensityT = 0;
+var rainIntensity = 0, rainTarget = 0;
 var rainScale = 0.5, rw = 0, rh = 0;
 var rainTrailC = null, rainTrailCtx = null;
 var rainHeadC = null, rainHeadCtx = null;
@@ -1076,84 +1080,88 @@ function spawnSnow(b, spread) {
     age: 0, life: 50, depth: depth
   });
 }
+function isRaining() { return S.weather === 'drizzle' || S.weather === 'rain'; }
+var RAIN_PROFILES = {
+  drizzle: { level: 0.28, count: 32, speed: 145, length: 8, alpha: 0.26, drops: 4, seedDrops: 9, radius: 2.5, cap: 30, wind: 0.25 },
+  rain: { level: 0.88, count: 126, speed: 370, length: 24, alpha: 0.47, drops: 22, seedDrops: 24, radius: 5.4, cap: 72, wind: 0.80 }
+};
+function rainProfile() { return RAIN_PROFILES[S.weather] || RAIN_PROFILES.rain; }
 function newRainStreak(b, spread) {
-  var depth = Math.random();
-  return { x: b.x + Math.random() * b.w, y: b.y + (spread ? Math.random() * b.h : -22 * rainScale),
-    speed: (220 + depth * 270) * rainScale, length: (11 + depth * 23) * rainScale,
-    width: (0.5 + depth * 0.7) * rainScale, alpha: 0.22 + depth * 0.34 };
+  var depth = Math.random(), p = rainProfile();
+  return { x: b.x + Math.random() * b.w, y: b.y + (spread ? Math.random() * b.h : -p.length * 2 * rainScale),
+    speed: p.speed * (0.55 + depth * 0.85) * rainScale,
+    length: p.length * (0.5 + depth) * rainScale,
+    width: (0.45 + depth * 0.65) * rainScale, alpha: p.alpha * (0.4 + depth * 0.6) };
 }
 function primeWeather(mode) {
   if (!rainCanvas) return;
   var b = weatherBounds(), n = clamp(b.w * b.h / (rainScale * rainScale * 150000), 0.65, 1.8) * (qualityTier === 0 ? 1 : 0.7);
-  if (mode === 'rain') {
-    if (!rainStreaks.length) for (var i = 0; i < 60 * n; i++) rainStreaks.push(newRainStreak(b, true));
-    if (!rainDrops.length) rainAcc = 14 * n;
+  if (isRaining()) {
+    var p = rainProfile(), count = Math.min(qualityTier === 0 ? 180 : 100, Math.ceil(p.count * n));
+    while (rainStreaks.length < count) rainStreaks.push(newRainStreak(b, true));
+    if (rainStreaks.length > count) rainStreaks.length = count;
+    if (!rainDrops.length) rainAcc = p.seedDrops * n;
   }
   if (mode === 'snow' && !snowFlakes.length) for (var j = 0; j < 72 * n; j++) spawnSnow(b, true);
 }
 function updateWeatherButton() {
-  var names = { clear: '晴', rain: '雨', snow: '雪' };
+  var names = { clear: '晴', drizzle: '小雨', rain: '大雨', snow: '雪' };
   var paths = {
     clear: '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4L19 5"></path>',
-    rain: '<path d="M6 15a4 4 0 0 1 0-8 6 6 0 0 1 11-1 4.5 4.5 0 0 1 1 9M7 18l-1 3m6-3-1 3m6-3-1 3"></path>',
+    drizzle: '<path d="M6 14a4 4 0 0 1 0-8 6 6 0 0 1 11-1 4.5 4.5 0 0 1 1 9M8 18v1m7-1v1"></path>',
+    rain: '<path d="M6 12a3.5 3.5 0 0 1 0-7 6 6 0 0 1 11-1 4.5 4.5 0 0 1 1 8M7 15l-2 4m8-4-2 4m8-4-2 4M8 21l-.5 1m6-1-.5 1"></path>',
     snow: '<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9 4l3 3 3-3M9 20l3-3 3 3M4 10l4-1-1-4m10 14-1-4 4-1M4 14l4 1-1 4m10-14-1 4 4 1"></path>'
   };
   btnWeather.querySelector('svg').innerHTML = paths[S.weather];
+  btnWeather.querySelector('span').textContent = names[S.weather];
   btnWeather.setAttribute('aria-label', '切换天气，当前：' + names[S.weather]);
-  btnWeather.title = '当前：' + names[S.weather] + ' · 晴 / 雨 / 雪';
+  btnWeather.title = '当前：' + names[S.weather] + ' · 晴 / 小雨 / 大雨 / 雪';
 }
 function setWeather(mode, level, name) {
-  S.weather = mode;
-  S.weatherLevel = clamp(level, 0, 1);
-  S.weatherHold = 18;
-  rainTarget = S.weatherLevel;
-  rainIntensity = S.weatherLevel;
-  primeWeather(mode);
-  updateWeatherButton();
-  showLabel(name);
-  hideHint();
+  S.weather = mode; S.weatherLevel = clamp(level, 0, 1);
+  rainTarget = S.weatherLevel; rainIntensity = S.weatherLevel;
+  if (isRaining()) {
+    var b = weatherBounds();
+    rainStreaks = rainStreaks.map(function (streak) { var fresh = newRainStreak(b, true); fresh.x = streak.x; fresh.y = streak.y; return fresh; });
+  }
+  primeWeather(mode); updateWeatherButton(); showLabel(name); hideHint();
 }
-function randomWeather() {
-  // Predictable cycle: every activation gives a different, immediate result.
-  var mode = S.weather === 'clear' ? 'rain' : S.weather === 'rain' ? 'snow' : 'clear';
-  setWeather(mode, mode === 'clear' ? 0 : 0.68, mode === 'rain' ? '下雨了' : mode === 'snow' ? '下雪了' : '放晴');
+function nextWeather() {
+  var states = ['clear', 'drizzle', 'rain', 'snow'];
+  var mode = states[(states.indexOf(S.weather) + 1) % states.length];
+  setWeather(mode, mode === 'clear' ? 0 : mode === 'snow' ? 0.68 : RAIN_PROFILES[mode].level,
+    mode === 'drizzle' ? '小雨' : mode === 'rain' ? '大雨' : mode === 'snow' ? '下雪了' : '放晴');
 }
 
 function updateRain(dt) {
   if (!rainCanvas) return;
-  var i, d, f, cap = qualityTier === 0 ? 70 : 45;
+  var i, d, f, profile = rainProfile(), cap = qualityTier === 0 ? profile.cap : Math.round(profile.cap * 0.7);
   var bounds = weatherBounds();
   primeWeather(S.weather);
 
-  /* 天气强度：用户设定保持约 18 秒，之后恢复自然起伏 */
-  if (S.weatherHold > 0) {
-    S.weatherHold -= dt;
-    rainTarget = S.weatherLevel;
-    rainIntensity += (rainTarget - rainIntensity) * Math.min(1, dt * 0.9);
-  } else {
-    rainIntensityT -= dt;
-    if (rainIntensityT <= 0) {
-      rainIntensityT = 6 + Math.random() * 14;
-      rainTarget = 0.30 + Math.random() * 0.70;
-    }
-    rainIntensity += (rainTarget - rainIntensity) * Math.min(1, dt * 0.25);
-    S.weatherLevel = rainIntensity;
-  }
+  // Gentle variation stays within the selected intensity; drizzle never becomes a downpour.
+  var baseLevel = isRaining() ? profile.level : S.weather === 'snow' ? 0.68 : 0;
+  rainTarget = baseLevel * (0.94 + 0.06 * Math.sin(S.time * 0.36));
+  rainIntensity += (rainTarget - rainIntensity) * Math.min(1, dt * 2.0);
+  S.weatherLevel = rainIntensity;
   /* 风向缓慢摆动（雨丝与雪花都会被吹偏） */
   S.windT -= dt;
   if (S.windT <= 0) { S.windT = 4 + Math.random() * 8; S.windTarget = (Math.random() - 0.5) * 34; }
   S.wind += (S.windTarget - S.wind) * Math.min(1, dt * 0.4);
   /* 雨雪强度的视觉缓存（供着色器做空气透视） */
-  S.rainAmt += ((S.weather === 'rain' ? rainIntensity : 0) - S.rainAmt) * (1 - Math.exp(-dt * 10));
+  S.rainAmt += ((isRaining() ? rainIntensity : 0) - S.rainAmt) * (1 - Math.exp(-dt * 10));
   S.snowAmt += ((S.weather === 'snow' ? rainIntensity : 0) - S.snowAmt) * (1 - Math.exp(-dt * 10));
+
+  if (!isRaining() && S.rainAmt < 0.002) { rainStreaks.length = 0; rainDrops.length = 0; rainAcc = 0; rainTrailCtx.clearRect(0,0,rw,rh); }
+  if (S.weather !== 'snow' && S.snowAmt < 0.002) { snowFlakes.length = 0; snowAcc = 0; }
 
   /* 生成：尺寸按幂律分布（小滴多、大滴少），雨越大平均雨滴越大 */
   var areaN = clamp(bounds.w * bounds.h / (rainScale * rainScale * 200000), 0.6, 1.8);
-  rainAcc += dt * (S.weather === 'rain' ? (9 + 26 * rainIntensity) : 0) * areaN * (qualityTier === 0 ? 1 : 0.7);
+  rainAcc += dt * (isRaining() ? profile.drops : 0) * areaN * (qualityTier === 0 ? 1 : 0.7);
   while (rainAcc >= 1) {
     rainAcc -= 1;
     if (rainDrops.length >= cap) break;
-    var sz = 1.0 + Math.pow(Math.random(), 2.3) * (2.4 + 5.0 * rainIntensity);
+    var sz = (0.85 + Math.pow(Math.random(), 2.3) * profile.radius) * rainScale;
     var rc = sz / rainScale;                       /* css px 半径 */
     var vf = 0.6 + Math.random() * 0.8;            /* 个体速度系数 */
     var cssV = 0.25 * rc * rc * vf;
@@ -1162,9 +1170,9 @@ function updateRain(dt) {
     rainDrops.push({
       x: bounds.x + Math.random() * bounds.w,
       y: bounds.y + Math.random() * bounds.h,
-      r: sz, vy: cssV * 0.1 / rainScale,
-      maxV: cssV / rainScale, accel: 0.8 + Math.random() * 2.0, vf: vf,
-      age: 0, life: 3 + Math.random() * 6, seed: Math.random(),
+      r: sz, vy: cssV * 0.1 * rainScale,
+      maxV: cssV * rainScale, accel: 0.8 + Math.random() * 2.0, vf: vf,
+      age: 0.25, life: 5 + Math.random() * 7, seed: Math.random(),
       state: Math.random() < 0.5 ? 1 : 0, stateT: 0.2 + Math.random() * 1.8
     });
   }
@@ -1179,8 +1187,8 @@ function updateRain(dt) {
   for (i = 0; i < rainStreaks.length; i++) {
     var streak = rainStreaks[i];
     streak.y += streak.speed * dt;
-    streak.x += (S.wind * rainScale - streak.speed * 0.045) * dt;
-    if (streak.y > bounds.y + bounds.h + streak.length || streak.x < bounds.x - 10) rainStreaks[i] = newRainStreak(bounds, false);
+    streak.x += (S.wind * profile.wind * rainScale - streak.speed * 0.035) * dt;
+    if (streak.y > bounds.y + bounds.h + streak.length || streak.x < bounds.x - 10 || streak.x > bounds.x + bounds.w + 10) rainStreaks[i] = newRainStreak(bounds, false);
   }
 
   /* 雨滴断续下滑：附着时吸水变大，滑动时把水留在轨迹上变小；
@@ -1196,7 +1204,7 @@ function updateRain(dt) {
     if (d.state) d.r += d.r * 0.080 * dt;
     else d.r -= d.r * 0.060 * dt;
     var rcN = clamp(d.r / rainScale, 0.5, 40);
-    d.maxV = clamp(0.25 * rcN * rcN * d.vf, 0.4, 95) / rainScale;
+    d.maxV = clamp(0.25 * rcN * rcN * d.vf, 0.4, 95) * rainScale;
     var tgt = d.state ? d.maxV : d.maxV * 0.06;
     d.vy += (tgt - d.vy) * Math.min(1, dt * d.accel);
     var ox = d.x, oy = d.y;
@@ -1204,7 +1212,7 @@ function updateRain(dt) {
     /* 风把雨丝吹斜 */
     d.x += (Math.sin(d.age * 1.4 + d.seed * 13.0) * d.vy * 0.06 + S.wind * 0.20) * dt;
     if (d.y - oy > 0.5 || Math.abs(d.x - ox) > 0.5) drawRainTrail(ox, oy, d.x, d.y, d.r);
-    if (d.y > rh + d.r * 2 || d.age > d.life || d.r < 0.6 || d.r > 14) rainDrops.splice(i, 1);
+    if (d.y > rh + d.r * 2 || d.age > d.life || d.r < 0.35 * rainScale || d.r > 14 * rainScale) rainDrops.splice(i, 1);
   }
 
   /* 雪花飘落：摇曳 + 风偏 + 忽快忽慢 */
@@ -1228,7 +1236,7 @@ function updateRain(dt) {
   rainHeadCtx.globalAlpha = Math.min(1, S.rainAmt / 0.68);
   for (i = 0; i < rainDrops.length; i++) {
     d = rainDrops[i];
-    var a = 0.60 + 0.40 * Math.min(1, d.r / 5);
+    var a = (0.48 + 0.36 * Math.min(1, d.r / (4 * rainScale))) * Math.min(1, d.age * 4);
     var rr = d.r * 1.08;
     var g = rainHeadCtx.createRadialGradient(d.x, d.y, 0, d.x, d.y, rr);
     g.addColorStop(0, 'rgba(255,0,0,' + a + ')');
@@ -1268,7 +1276,8 @@ function updateRain(dt) {
     snowCtx.strokeStyle = 'rgba(0,0,255,' + sr.alpha + ')';
     snowCtx.lineWidth = sr.width;
     snowCtx.beginPath(); snowCtx.moveTo(sr.x, sr.y);
-    snowCtx.lineTo(sr.x + sr.length * 0.045, sr.y - sr.length); snowCtx.stroke();
+    var slant = 0.035 - S.wind * profile.wind * rainScale / Math.max(1, sr.speed);
+    snowCtx.lineTo(sr.x + sr.length * slant, sr.y - sr.length); snowCtx.stroke();
   }
   snowCtx.globalAlpha = 1;
   /* R=attached rain, G=wet trails, B=falling precipitation, A=255. */
@@ -1498,7 +1507,9 @@ var FS_SRC = [
 '  bg -= vec3(0.05, 0.06, 0.07) * rHead * (1.0 - rsp) * 0.30;',
 '  /* 雪花：柔和亮点，雾厚时被散射得更虚 */',
 '  float snowMix = uSnowAmt / max(0.001, uSnowAmt + uRainAmt);',
-'  bg = mix(bg, mix(vec3(.48,.58,.66),vec3(.96,.98,1.0),snowMix), rSnow * mix(.72,.90,snowMix) * (1.0-.45*fog));',
+'  float rainLight = 1.0 - smoothstep(.25,.70,dot(bg,vec3(.2126,.7152,.0722)));',
+'  vec3 rainColor = mix(vec3(.22,.30,.34),vec3(.86,.91,.94),rainLight);',
+'  bg = mix(bg, mix(rainColor,vec3(.96,.98,1.0),snowMix), rSnow * mix(.82,.90,snowMix) * (1.0-.45*fog));',
 '',
 '  /* 雨雪带来的空气透视：雨中更沉更暗，雪中更亮更平 */',
 '  bg = mix(bg, bg * vec3(0.84, 0.88, 0.97) + vec3(0.015, 0.025, 0.045), uRainAmt * 0.55);',
@@ -1972,12 +1983,12 @@ function render(t) {
 
 /* ================================================================ 麦克风 */
 var micStream = null, micCtx = null, micAn = null, micTime = null, micFreq = null;
-var micFloor = 0.006;
+var micFloor = 0.006, micPending = false, micRequest = 0;
 
 function updateMic(dt) {
   S.micLevel = 0;
   if (!S.micOn || !micAn || !micTime) return;
-  if (micCtx && micCtx.state === 'suspended') return;
+  if (micCtx && micCtx.state !== 'running') return;
 
   micAn.getByteTimeDomainData(micTime);
   var n = micTime.length, sum = 0, i, v;
@@ -2005,65 +2016,75 @@ function updateMic(dt) {
   S.micLevel = S.micEnv;
 }
 
-function micFail(msg) {
-  stopMic();
-  showToast(msg + ' · 可按住画面或空格呼气', 3800);
+function updateMicButton() {
+  var paused = S.micOn && micCtx && micCtx.state !== 'running';
+  btnMic.classList.toggle('active', S.micOn);
+  btnMic.classList.toggle('pending', micPending);
+  btnMic.setAttribute('aria-pressed', S.micOn ? 'true' : 'false');
+  btnMic.setAttribute('aria-busy', micPending ? 'true' : 'false');
+  btnMic.querySelector('span').textContent = micPending ? '连接中' : paused ? '点按恢复' : S.micOn ? '已开启' : '麦克风';
+  btnMic.setAttribute('aria-label', micPending ? '取消麦克风连接' : paused ? '恢复麦克风哈气' : S.micOn ? '关闭麦克风哈气' : '开启麦克风哈气');
 }
-
-function micOk(stream) {
+function micFail(msg) {
+  stopMic(); showToast(msg + '，可以用「按住哈气」', 3400);
+}
+function stopStream(stream) { stream.getTracks().forEach(function (track) { track.stop(); }); }
+function micOk(stream, request) {
+  if (request !== micRequest || !micPending || document.hidden) { stopStream(stream); return; }
   micStream = stream;
-  var AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) { micFail('当前浏览器不支持音频分析'); return; }
   try {
-    micCtx = new AC();
-    if (micCtx.state === 'suspended' && micCtx.resume) micCtx.resume();
     var src = micCtx.createMediaStreamSource(stream);
-    /* 高通 700Hz：滤掉环境低频噪声，只留气流 */
     var hp = micCtx.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 700; hp.Q.value = 0.7;
-    micAn = micCtx.createAnalyser();
-    micAn.fftSize = 1024; micAn.smoothingTimeConstant = 0.5;
-    /* 静音回路：保持图活跃但不外放，避免啸叫 */
+    micAn = micCtx.createAnalyser(); micAn.fftSize = 1024; micAn.smoothingTimeConstant = 0.5;
     var mute = micCtx.createGain(); mute.gain.value = 0;
     src.connect(hp); hp.connect(micAn); micAn.connect(mute); mute.connect(micCtx.destination);
-    micTime = new Uint8Array(micAn.fftSize);
-    micFreq = new Uint8Array(micAn.frequencyBinCount);
+    micTime = new Uint8Array(micAn.fftSize); micFreq = new Uint8Array(micAn.frequencyBinCount);
     micFloor = 0.006; S.micEnv = 0; S.micLevel = 0;
-    S.micOn = true;
-    btnMic.classList.remove('off'); btnMic.classList.add('active');
-    hideHint();
-    showToast('麦克风已开启，试着吹一口气', 2600);
-  } catch (e) { micFail('麦克风初始化失败'); }
+    micPending = false; S.micOn = true;
+    stream.getAudioTracks().forEach(function (track) {
+      track.onended = function () { if (request === micRequest) micFail('麦克风连接已结束'); };
+    });
+    updateMicButton(); hideHint();
+    showToast('对着手机麦克风轻轻哈气 · 声音仅在本机分析', 3200);
+  } catch (e) { micFail('麦克风暂时不可用'); }
 }
-
 function startMic() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    micFail('当前浏览器不支持麦克风');
-    return;
-  }
-  showToast('请允许使用麦克风…', 3000);
-  var cstr = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
-  navigator.mediaDevices.getUserMedia(cstr).then(micOk).catch(function () {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(micOk)
-      .catch(function () { micFail('麦克风授权失败'); });
+  if (micPending || S.micOn) return;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micFail('当前浏览器未开放麦克风'); return; }
+  var request = ++micRequest;
+  micPending = true; updateMicButton();
+  try {
+    // Create and resume inside the tap gesture, before waiting for permission.
+    micCtx = new AC();
+    micCtx.onstatechange = function () { if (request === micRequest) updateMicButton(); };
+    if (micCtx.resume) micCtx.resume().catch(function () { if (request === micRequest) micFail('音频未能启动'); });
+  } catch (e) { micFail('音频未能启动'); return; }
+  showToast('允许麦克风后，轻轻哈一口气', 3000);
+  var constraints = { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } };
+  navigator.mediaDevices.getUserMedia(constraints).then(function (stream) { micOk(stream, request); }).catch(function (err) {
+    if (request !== micRequest) return;
+    if (err && err.name === 'OverconstrainedError') {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) { micOk(stream, request); }).catch(function () { if (request === micRequest) micFail('麦克风未能开启'); });
+    } else micFail('麦克风未开启');
   });
 }
-
 function stopMic() {
+  ++micRequest; micPending = false;
   S.micOn = false; S.micLevel = 0; S.micEnv = 0;
-  if (micStream) {
-    var tr = micStream.getTracks();
-    for (var i = 0; i < tr.length; i++) tr[i].stop();
-    micStream = null;
-  }
-  if (micCtx) { try { if (micCtx.close) micCtx.close(); } catch (e) {} micCtx = null; }
+  if (micStream) { stopStream(micStream); micStream = null; }
+  if (micCtx) { var ctx = micCtx; micCtx = null; ctx.onstatechange = null; try { if (ctx.close) ctx.close().catch(function () {}); } catch (e) {} }
   micAn = null; micTime = null; micFreq = null;
-  btnMic.classList.add('off'); btnMic.classList.remove('active');
-  btnMic.style.boxShadow = '';
-  btnMic.style.borderColor = '';
+  updateMicButton(); btnMic.style.setProperty('--mic-level', '0');
 }
-
-function toggleMic() { if (S.micOn) stopMic(); else startMic(); }
+function toggleMic() {
+  if (micPending) { stopMic(); showToast('已取消，按住按钮也可以哈气'); }
+  else if (S.micOn && micCtx && micCtx.state !== 'running') {
+    micCtx.resume().then(updateMicButton).catch(function () { micFail('麦克风未能恢复'); });
+  } else if (S.micOn) { stopMic(); showToast('麦克风已关闭', 1500); }
+  else startMic();
+}
 
 /* ================================================================ 呼吸源 */
 function updateHoldCheck() {
@@ -2080,7 +2101,7 @@ function updateHoldCheck() {
 }
 
 function updateBreath(dt) {
-  var holdT = (S.down && S.mode === 'hold') ? 1 : 0;
+  var holdT = (S.manualHeld || (S.down && S.mode === 'hold')) ? 1 : 0;
   var hk = Math.min(1, dt * (holdT ? 5 : 9));
   S.holdLevel += (holdT - S.holdLevel) * hk;
 
@@ -2198,7 +2219,7 @@ function fakePointerUp(cancelled) {
   if (!cancelled && !S.tapMoved && nowMs - S.tapStarted < 250) {
     var dx = (nx - S.lastTapX) * S.cssW, dy = (ny - S.lastTapY) * S.cssH;
     if (S.lastTapT && nowMs - S.lastTapT < 320 && dx * dx + dy * dy < 1600) {
-      randomWeather(); S.lastTapT = 0;
+      nextWeather(); S.lastTapT = 0;
     } else { S.lastTapT = nowMs; S.lastTapX = nx; S.lastTapY = ny; }
   } else S.lastTapT = 0;
   if (S.mode === 'hold') S.mode = 'wipe';
@@ -2207,7 +2228,7 @@ function fakePointerUp(cancelled) {
 function targetInDock(target) {
   var el = target;
   while (el && el !== document) {
-    if (el.id === 'photoPicker' || el.id === 'shadeHandle' || el.id === 'dock' || el.id === 'melt' || el.id === 'btnMic' || el.id === 'btnScene' ||
+    if (el.id === 'controls' || el.id === 'shadeHandle' || el.id === 'dock' || el.id === 'melt' || el.id === 'btnMic' || el.id === 'btnScene' ||
         el.id === 'btnWeather' || el.id === 'btnWindow' || el.id === 'btnUpload') return true;
     el = el.parentNode;
   }
@@ -2296,7 +2317,6 @@ function bindInput() {
 function bindKeys() {
   window.addEventListener('keydown', function (e) {
     var k = e.key || e.code;
-    if (!document.getElementById('photoPicker').hidden) return;
     var isSpace = (k === ' ' || k === 'Spacebar' || k === 'Space');
     if (isSpace) {
       var tag = e.target && e.target.tagName;
@@ -2316,10 +2336,51 @@ function bindKeys() {
     }
   }, false);
   window.addEventListener('blur', function () {
-    S.space = false;
+    S.space = false; stopManualBreath();
     S.pointerId = null;
     fakePointerUp(true);
   }, false);
+}
+
+function stopManualBreath() {
+  S.manualHeld = false;
+  if (btnBreath) { btnBreath.classList.remove('held'); btnBreath.querySelector('span').textContent = '按住哈气'; }
+}
+function bindBreathButton() {
+  var pointer = null;
+  function start(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    var point = MIST_WINDOWS.breathPoint(aperture);
+    if (!point) { showToast('先拉开遮光板，再哈气', 2000); return; }
+    fakePointerUp(true); S.holdX = point.x; S.holdY = point.y;
+    S.manualHeld = true; btnBreath.classList.add('held');
+    btnBreath.querySelector('span').textContent = '正在哈气'; hideHint();
+  }
+  function end() { pointer = null; stopManualBreath(); }
+  if (window.PointerEvent) {
+    btnBreath.addEventListener('pointerdown', function (e) {
+      if (e.button > 0 || pointer !== null) return;
+      pointer = e.pointerId; start(e);
+      try { btnBreath.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    function release(e) { if (pointer === null || e.pointerId === pointer) end(); }
+    btnBreath.addEventListener('pointerup', release);
+    btnBreath.addEventListener('pointercancel', release);
+    btnBreath.addEventListener('lostpointercapture', release);
+  } else {
+    btnBreath.addEventListener('touchstart', function (e) { if (e.touches.length === 1) start(e); }, {passive:false});
+    btnBreath.addEventListener('touchend', end); btnBreath.addEventListener('touchcancel', end);
+    btnBreath.addEventListener('mousedown', function (e) { if (!e.button) start(e); });
+    window.addEventListener('mouseup', end);
+  }
+  btnBreath.addEventListener('keydown', function (e) { if (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar') { e.stopPropagation(); if (!e.repeat) start(e); else e.preventDefault(); } });
+  btnBreath.addEventListener('keyup', function (e) { if (e.key === ' ' || e.key === 'Enter' || e.key === 'Spacebar') { e.stopPropagation(); e.preventDefault(); end(); } });
+  btnBreath.addEventListener('blur', end);
+  btnBreath.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  function suspend() { end(); S.space = false; S.pointerId = null; fakePointerUp(true); stopMic(); }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) suspend(); });
+  window.addEventListener('pagehide', suspend);
+  window.addEventListener('blur', end);
 }
 
 /* ================================================================ UI */
@@ -2346,57 +2407,14 @@ function selectScene(index) {
   S.customImg = null;
   loadScene(index);
   buildBackground();
-  showLabel(('0' + SCENES[index].id).slice(-2) + ' · ' + SCENES[index].name);
+  showLabel(SCENES[index].name);
+  loadScene((index + 1) % SCENES.length);
   hideHint();
 }
 function nextScene() { selectScene((S.sceneIndex + 1) % SCENES.length); }
 
-function bindPhotoPicker() {
-  var picker = document.getElementById('photoPicker');
-  var grid = document.getElementById('photoGrid');
-  var close = document.getElementById('closePhotos');
-  var buttons = [], populated = false;
-  function dismiss() {
-    picker.hidden = true; document.body.classList.remove('choosing-photo'); btnScene.setAttribute('aria-expanded', 'false'); btnScene.focus();
-  }
-  function open() {
-    if (!populated) {
-      SCENES.forEach(function (scene, index) {
-        var button = document.createElement('button');
-        var img = new Image();
-        button.type = 'button'; button.className = 'photo-option';
-        var number = ('0' + scene.id).slice(-2);
-        button.setAttribute('aria-label', number + ' · ' + scene.name);
-        img.alt = ''; img.width = 120; img.height = 150;
-        img.onload = function () { scene.preview = img; };
-        img.src = scene.thumb;
-        var caption = document.createElement('span');
-        caption.textContent = number + ' · ' + scene.name;
-        button.appendChild(img); button.appendChild(caption);
-        button.addEventListener('click', function () { selectScene(index); dismiss(); });
-        grid.appendChild(button); buttons.push(button);
-      });
-      populated = true;
-    }
-    buttons.forEach(function (button, i) { button.setAttribute('aria-pressed', !S.customImg && i === S.sceneIndex ? 'true' : 'false'); });
-    S.space = false; fakePointerUp(true); hideHint();
-    picker.hidden = false; document.body.classList.add('choosing-photo'); btnScene.setAttribute('aria-expanded', 'true');
-    buttons[S.sceneIndex].focus();
-  }
-  close.addEventListener('click', dismiss);
-  picker.addEventListener('click', function (e) { if (e.target === picker) dismiss(); });
-  picker.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { e.preventDefault(); dismiss(); }
-    if (e.key === 'Tab') {
-      var first = close, last = buttons[buttons.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    }
-  });
-  btnScene.addEventListener('click', open);
-}
-
 function nextWindow() {
+  stopManualBreath();
   S.windowStyle = S.windowStyle === 4 ? 2 : S.windowStyle === 2 ? 0 : 4;
   fakePointerUp(true);
   syncFrame();
@@ -2406,21 +2424,11 @@ function nextWindow() {
   showLabel(S.windowStyle === 4 ? '飞机舷窗' : S.windowStyle === 2 ? '火车窗' : '无框玻璃');
 }
 
-var uiTick = 0, lastUiLevel = -1;
+var uiTick = 0;
 function updateUI() {
-  if (S.micOn) {
-    uiTick++;
-    if (uiTick % 3 === 0) {
-      var l = S.micLevel;
-      if (Math.abs(l - lastUiLevel) >= 0.02 || l === 1 || l === 0) {
-        lastUiLevel = l;
-        btnMic.style.boxShadow =
-          '0 0 ' + (8 + 20 * l).toFixed(1) + 'px rgba(255,186,110,' + (0.10 + 0.40 * l).toFixed(3) + '), ' +
-          'inset 0 0 14px rgba(255,206,150,' + (0.04 + 0.16 * l).toFixed(3) + ')';
-        btnMic.style.borderColor = 'rgba(255,206,150,' + (0.16 + 0.40 * l).toFixed(3) + ')';
-      }
-    }
-  }
+  if (++uiTick % 3) return;
+  btnBreath.style.setProperty('--breath-level', S.breathLevel.toFixed(2));
+  btnMic.style.setProperty('--mic-level', S.micLevel.toFixed(2));
 }
 
 /* ================================================================ 主循环 */
@@ -2431,10 +2439,10 @@ if (debugMode) window.__mist = {
     function avg(a) { var sum = 0; for (var i = 0; i < a.length; i++) sum += a[i]; return sum / Math.max(1, a.length); }
     var centre = ((dh * 0.48) | 0) * dw + ((dw * 0.5) | 0);
     return { gl: useGL, scene: S.sceneIndex, photoNumber: SCENES[S.sceneIndex].id, photoReady: !!SCENES[S.sceneIndex].image,
-      rain: rainDrops.length, rainStreaks: rainStreaks.length, snow: snowFlakes.length, rainAmt: S.rainAmt, snowAmt: S.snowAmt,
+      rain: rainDrops.length, rainStreaks: rainStreaks.length, snow: snowFlakes.length, rainAmt: S.rainAmt, snowAmt: S.snowAmt, rainIntensity: rainIntensity,
       custom: !!S.customImg, windowStyle: S.windowStyle, melt: S.melt, weather: S.weather,
       fps: 1000 / Math.max(1, avg(qaFrames)), cpuMs: avg(qaCpu), frames: qaTicks,
-      mic: S.micLevel, breath: S.breathLevel, fog: fogSum / Math.max(1, flen),
+      mic: S.micLevel, micOn: S.micOn, micPending: micPending, manualHeld: S.manualHeld, breath: S.breathLevel, fog: fogSum / Math.max(1, flen),
       centerFog: fogF ? fogF[centre] : 0, grid: [dw, dh], dpr: S.dpr, drops: drops.length,
       aperture: aperture ? [aperture.x, aperture.y, aperture.w, aperture.h] : null,
       shade: MIST_WINDOWS.state(), flight: flightScene(), samplers: useGL ? 7 : 0, error: window.__dbgErr, look: originalLook ? 'original' : softMist ? 'soft-mist' : 'previous' };
@@ -2500,7 +2508,8 @@ function frame(t) {
 function syncFrame() {
   aperture = MIST_WINDOWS.draw(frameCanvas, S.windowStyle, S.cssW, S.cssH, S.dpr);
   btnWindow.setAttribute('aria-label', '切换窗户，当前：' + (S.windowStyle === 4 ? '飞机舷窗' : S.windowStyle === 2 ? '火车窗' : '无框玻璃'));
-  hintEl.innerHTML=S.windowStyle===4?'按住玻璃哈气，划过写字<b>拖动上方把手，开合遮光板</b>':'按住玻璃哈气，划过写字<b>也可以按住空格，或打开麦克风</b>';
+  hintEl.innerHTML='按住哈气 · 松开写字<b>'+(S.windowStyle===4?'上方把手可开合遮光板':'也可打开麦克风，轻轻哈气')+'</b>';
+  hintEl.style.left = aperture.x + 'px'; hintEl.style.width = aperture.w + 'px'; hintEl.style.right = 'auto'; hintEl.style.padding = '0 12px';
   hintEl.style.top = S.windowStyle ? ((aperture.y + aperture.h * 0.47) / S.cssH * 100) + '%' : '57%';
   if (!MIST_WINDOWS.contains(aperture, S.lastPointer.x * S.cssW, S.lastPointer.y * S.cssH)) {
     S.lastPointer.x = (aperture.x + aperture.w * 0.5) / S.cssW;
@@ -2527,6 +2536,7 @@ function applyResize() {
   if (useGL && gl) gl.viewport(0, 0, S.bufW, S.bufH);
 }
 function onResize() {
+  stopManualBreath();
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(applyResize, 160);
 }
@@ -2540,7 +2550,8 @@ function bindDom() {
   hintEl = document.getElementById('hint');
   labelEl = document.getElementById('label');
   toastEl = document.getElementById('toast');
-  meltSegs = stage.querySelectorAll('#melt .seg');
+  btnBreath = document.getElementById('btnBreath');
+  btnMelt = document.getElementById('btnMelt');
   btnMic = document.getElementById('btnMic');
   btnScene = document.getElementById('btnScene');
   btnWeather = document.getElementById('btnWeather');
@@ -2551,22 +2562,18 @@ function bindDom() {
 
 function bindButtons() {
   btnMic.addEventListener('click', function () { toggleMic(); if (this.blur) this.blur(); }, false);
-  bindPhotoPicker();
+  bindBreathButton();
+  btnScene.addEventListener('click', function () { nextScene(); this.blur(); });
   updateWeatherButton();
-  btnWeather.addEventListener('click', function () { randomWeather(); if (this.blur) this.blur(); }, false);
+  btnWeather.addEventListener('click', function () { nextWeather(); if (this.blur) this.blur(); }, false);
   btnWindow.addEventListener('click', function () { nextWindow(); if (this.blur) this.blur(); }, false);
-  for (var mi = 0; mi < meltSegs.length; mi++) {
-    (function (idx) {
-      meltSegs[idx].addEventListener('click', function () {
-        S.melt = idx;
-        for (var k = 0; k < meltSegs.length; k++) {
-          if (k === idx) meltSegs[k].classList.add('on');
-          else meltSegs[k].classList.remove('on');
-        }
-        if (this.blur) this.blur();
-      }, false);
-    })(mi);
-  }
+  btnMelt.addEventListener('click', function () {
+    S.melt = (S.melt + 1) % 3;
+    var text = ['慢', '中', '快'][S.melt];
+    btnMelt.querySelector('span').textContent = '消散·' + text;
+    btnMelt.setAttribute('aria-label', '切换消散速度，当前：' + text);
+    showLabel('消散速度 · ' + text); this.blur();
+  });
   btnUpload.addEventListener('click', function () { fileEl.click(); if (this.blur) this.blur(); }, false);
 
   fileEl.addEventListener('change', function () {

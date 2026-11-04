@@ -8,19 +8,29 @@
   var position = 0, velocity = 0, target = null, dragging = false, pointer = null;
   var startY = 0, startPosition = 0, lastY = 0, lastTime = 0, moved = 0;
   var lastPaint = -99, light = 1, ready = false;
+  var layoutW = -1, layoutH = -1, safeInset = 0;
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function clamp(v,a,b) { return Math.max(a,Math.min(b,v)); }
   function mix(a,b,t) { return a+(b-a)*t; }
   function sign(v) { return v < 0 ? -1 : 1; }
 
   function geometry(type,W,H) {
-    var phone = W < 650, landscape = H < 500 && W > H, avail = Math.max(160,H-(landscape?64:160)), w=W, h=H;
-    if(type===1) { w=Math.min(W*.83,avail*1.45); h=Math.min(avail*.88,w/(phone?.83:1.45)); }
-    if(type===2) { h=Math.min(avail*.88,W*.79/.78); w=h*.78; }
-    if(type===3) { w=Math.min(W*.80,avail*1.10); h=Math.min(avail*.88,w/(phone?.85:1.10)); }
-    if(type===4) { h=Math.min(avail*.88,W*.72/.70); w=h*.70; }
-    var cy=(H-(landscape?0:108))*.50;
-    var r={x:(W-w)/2,y:type?cy-h/2:0,w:w,h:h,type:type,W:W,H:H,n:type===4?3.15:type===2?5.0:type===3?7:5};
+    var phone = W < 650, landscape = H < 500 && W > H;
+    if (W !== layoutW || H !== layoutH) {
+      layoutW = W; layoutH = H; var controls = document.getElementById('controls');
+      safeInset = controls ? Math.max(0, (parseFloat(getComputedStyle(controls).bottom) || 18) - 18) : 0;
+    }
+    var safeBottom = safeInset;
+    var viewW = landscape ? Math.max(180, W - 194) : W;
+    var top = landscape ? 20 : 42;
+    var bottom = landscape ? 20 : 172 + safeBottom;
+    var avail = Math.max(160, H - top - bottom), w = W, h = H;
+    if(type===1) { w=Math.min(viewW*.83,avail*1.45); h=Math.min(avail*.83,w/(phone?.83:1.45)); }
+    if(type===2) { h=Math.min(avail*.83,viewW*.79/.78); w=h*.78; }
+    if(type===3) { w=Math.min(viewW*.80,avail*1.10); h=Math.min(avail*.83,w/(phone?.85:1.10)); }
+    if(type===4) { h=Math.min(avail*.83,viewW*.72/.70); w=h*.70; }
+    var cy=top+avail*.50;
+    var r={x:type?(viewW-w)/2:0,y:type?cy-h/2:0,w:w,h:h,type:type,W:W,H:H,n:type===4?3.15:type===2?5.0:type===3?7:5};
     r.rim=w*(type===4?.145:type===2?.09:type===3?.065:.07);
     r.path=path(r,0);
     return r;
