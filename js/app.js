@@ -601,32 +601,22 @@ function sceneBokeh(w, h, seed) {
 
 // Photos are local, metadata-free exports. Focus points keep the subject in a landscape crop.
 var SCENES = [
-  {"name": "阳光与云海", "file": "assets/photos/cloud-dusk.jpg", "thumb": "assets/photos/thumbs/cloud-dusk.jpg", "focus": [0.28, 0.46], "tint": [0.93, 0.91, 0.87], "saturation": 0.78, "flight": true, "make": scenePines, "seed": 90210 },
-  {"name": "云海之上", "file": "assets/photos/cloud-sea.jpg", "thumb": "assets/photos/thumbs/cloud-sea.jpg", "focus": [0.5, 0.45], "tint": [0.89, 0.92, 0.94], "saturation": 0.82, "flight": true, "make": scenePines, "seed": 90210 },
-  {"name": "雪谷", "file": "assets/photos/winter-valley.jpg", "thumb": "assets/photos/thumbs/winter-valley.jpg", "focus": [0.51, 0.51], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "雪地暖灯", "file": "assets/photos/snow-cabin.jpg", "thumb": "assets/photos/thumbs/snow-cabin.jpg", "focus": [0.57, 0.68], "tint": [0.89, 0.92, 0.94], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "雪屋的黄昏", "file": "assets/photos/snow-roof.jpg", "thumb": "assets/photos/thumbs/snow-roof.jpg", "focus": [0.5, 0.55], "tint": [0.89, 0.92, 0.94], "saturation": 0.62, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "冷海边的红屋", "file": "assets/photos/coast.jpg", "thumb": "assets/photos/thumbs/coast.jpg", "focus": [0.52, 0.46], "tint": [0.89, 0.92, 0.94], "saturation": 0.55, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "船上的蓝调时刻", "file": "assets/photos/ferry-dusk.jpg", "thumb": "assets/photos/thumbs/ferry-dusk.jpg", "focus": [0.58, 0.44], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "雪中的车站", "file": "assets/photos/snow-stop.jpg", "thumb": "assets/photos/thumbs/snow-stop.jpg", "focus": [0.5, 0.54], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "雨夜咖啡馆", "file": "assets/photos/cafe-rain.jpg", "thumb": "assets/photos/thumbs/cafe-rain.jpg", "focus": [0.5, 0.54], "tint": [0.93, 0.91, 0.87], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "咖啡馆露台", "file": "assets/photos/cafe-terrace.jpg", "thumb": "assets/photos/thumbs/cafe-terrace.jpg", "focus": [0.5, 0.5], "tint": [0.93, 0.91, 0.87], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "蓝调街巷", "file": "assets/photos/blue-alley.jpg", "thumb": "assets/photos/thumbs/blue-alley.jpg", "focus": [0.5, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "河边的雨后", "file": "assets/photos/river-street.jpg", "thumb": "assets/photos/thumbs/river-street.jpg", "focus": [0.5, 0.52], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "街角星灯", "file": "assets/photos/city-dusk.jpg", "thumb": "assets/photos/thumbs/city-dusk.jpg", "focus": [0.5, 0.47], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "暮色广场", "file": "assets/photos/evening-square.jpg", "thumb": "assets/photos/thumbs/evening-square.jpg", "focus": [0.5, 0.45], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "夜里的橱窗", "file": "assets/photos/shop-window.jpg", "thumb": "assets/photos/thumbs/shop-window.jpg", "focus": [0.5, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "车窗外的街道", "file": "assets/photos/bus-street.jpg", "thumb": "assets/photos/thumbs/bus-street.jpg", "focus": [0.5, 0.52], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "傍晚的教堂", "file": "assets/photos/basilica.jpg", "thumb": "assets/photos/thumbs/basilica.jpg", "focus": [0.5, 0.4], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "河上的灯火", "file": "assets/photos/river-lights.jpg", "thumb": "assets/photos/thumbs/river-lights.jpg", "focus": [0.5, 0.48], "tint": [0.93, 0.91, 0.87], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "乐园亮灯了", "file": "assets/photos/night-garden.jpg", "thumb": "assets/photos/thumbs/night-garden.jpg", "focus": [0.55, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
-  {"name": "一起看日落", "file": "assets/photos/wing-sunset.jpg", "thumb": "assets/photos/thumbs/wing-sunset.jpg", "focus": [0.52, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.7, "flight": false, "make": scenePines, "seed": 90210 }
+  {"id": 1, "name": "阳光与云海", "file": "assets/photos/cloud-dusk.jpg", "thumb": "assets/photos/thumbs/cloud-dusk.jpg", "focus": [0.28, 0.46], "tint": [0.93, 0.91, 0.87], "saturation": 0.78, "flight": true, "make": scenePines, "seed": 90210 },
+  {"id": 2, "name": "云海之上", "file": "assets/photos/cloud-sea.jpg", "thumb": "assets/photos/thumbs/cloud-sea.jpg", "focus": [0.5, 0.45], "tint": [0.89, 0.92, 0.94], "saturation": 0.82, "flight": true, "make": scenePines, "seed": 90210 },
+  {"id": 3, "name": "雪谷", "file": "assets/photos/winter-valley.jpg", "thumb": "assets/photos/thumbs/winter-valley.jpg", "focus": [0.51, 0.51], "tint": [0.89, 0.92, 0.94], "saturation": 0.58, "flight": false, "make": scenePines, "seed": 90210 },
+  {"id": 4, "name": "雪地暖灯", "file": "assets/photos/snow-cabin.jpg", "thumb": "assets/photos/thumbs/snow-cabin.jpg", "focus": [0.57, 0.68], "tint": [0.89, 0.92, 0.94], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
+  {"id": 7, "name": "船上的蓝调时刻", "file": "assets/photos/ferry-dusk.jpg", "thumb": "assets/photos/thumbs/ferry-dusk.jpg", "focus": [0.58, 0.44], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
+  {"id": 14, "name": "暮色广场", "file": "assets/photos/evening-square.jpg", "thumb": "assets/photos/thumbs/evening-square.jpg", "focus": [0.5, 0.45], "tint": [0.89, 0.92, 0.94], "saturation": 0.65, "flight": false, "make": scenePines, "seed": 90210 },
+  {"id": 18, "name": "河上的灯火", "file": "assets/photos/river-lights.jpg", "thumb": "assets/photos/thumbs/river-lights.jpg", "focus": [0.5, 0.48], "tint": [0.93, 0.91, 0.87], "saturation": 0.6, "flight": false, "make": scenePines, "seed": 90210 },
+  {"id": 20, "name": "一起看日落", "file": "assets/photos/wing-sunset.jpg", "thumb": "assets/photos/thumbs/wing-sunset.jpg", "focus": [0.52, 0.48], "tint": [0.89, 0.92, 0.94], "saturation": 0.7, "flight": false, "make": scenePines, "seed": 90210 }
 ];
 var originalLook = /(?:[?&])look=original(?:&|$)/.test(location.search);
 var softMist = !originalLook && !/(?:[?&])look=previous(?:&|$)/.test(location.search);
 var debugMode = /(?:[?&])debug(?:[=&]|$)/.test(location.search);
 var sceneMatch = location.search.match(/[?&]scene=(1[0-9]|[0-9])(?:&|$)/);
 var windowMatch = location.search.match(/[?&]window=([0-4])(?:&|$)/);
+// Preserve the original photo numbers and bookmarked scene URLs after curation.
+var initialScene = sceneMatch ? SCENES.findIndex(function (scene) { return scene.id === Number(sceneMatch[1]) + 1; }) : (windowMatch && Number(windowMatch[1]) === 2 ? 2 : 0);
 
 var photoUse = 0;
 function loadScene(index) {
@@ -656,7 +646,7 @@ function loadScene(index) {
 /* ------------------------------------------------------------------ 全局状态 */
 var S = {
   cssW: 0, cssH: 0, dpr: 1, bufW: 1, bufH: 1,
-  sceneIndex: sceneMatch ? Number(sceneMatch[1]) : (windowMatch && Number(windowMatch[1]) === 2 ? 2 : 0), customImg: null,
+  sceneIndex: Math.max(0, initialScene), customImg: null,
   micOn: false, micLevel: 0, micEnv: 0,
   micDriftX: 0, micDriftY: 0, micDriftT: 0, micDriftA: 0,
   holdLevel: 0, holdX: 0, holdY: 0,
@@ -666,7 +656,7 @@ var S = {
   pointerType: 'mouse', pointerId: null,
   down: false, mode: 'wipe', downT: 0, lastMoveT: 0,
   lastX: 0.5, lastY: 0.47, downX: 0.5, downY: 0.47,
-  windowStyle: windowMatch && Number(windowMatch[1]) === 2 ? 2 : 4,
+  windowStyle: windowMatch && Number(windowMatch[1]) === 0 ? 0 : windowMatch && Number(windowMatch[1]) === 2 ? 2 : 4,
   rainAmt: 0, snowAmt: 0, melt: 1,
   weather: 'clear', weatherLevel: 0, weatherHold: 0,
   wind: 0, windTarget: 0, windT: 0,
@@ -690,6 +680,8 @@ var MELT = [
   { ev: 1.00, am: 1.00, ac: 1.00, df: 1.00 },
   { ev: 1.95, am: 1.65, ac: 1.60, df: 1.45 }
 ];
+// Slow evaporation, wet-mark fading and edge refill together, independently of drops.
+var MELT_TIME = 0.80;
 var meltSegs = [];
 var toastTimer = null, labelTimer = null;
 var hintHidden = false;
@@ -2354,7 +2346,7 @@ function selectScene(index) {
   S.customImg = null;
   loadScene(index);
   buildBackground();
-  showLabel(('0' + (index + 1)).slice(-2) + ' · ' + SCENES[index].name);
+  showLabel(('0' + SCENES[index].id).slice(-2) + ' · ' + SCENES[index].name);
   hideHint();
 }
 function nextScene() { selectScene((S.sceneIndex + 1) % SCENES.length); }
@@ -2373,7 +2365,7 @@ function bindPhotoPicker() {
         var button = document.createElement('button');
         var img = new Image();
         button.type = 'button'; button.className = 'photo-option';
-        var number = ('0' + (index + 1)).slice(-2);
+        var number = ('0' + scene.id).slice(-2);
         button.setAttribute('aria-label', number + ' · ' + scene.name);
         img.alt = ''; img.width = 120; img.height = 150;
         img.onload = function () { scene.preview = img; };
@@ -2405,13 +2397,13 @@ function bindPhotoPicker() {
 }
 
 function nextWindow() {
-  S.windowStyle = S.windowStyle === 4 ? 2 : 4;
+  S.windowStyle = S.windowStyle === 4 ? 2 : S.windowStyle === 2 ? 0 : 4;
   fakePointerUp(true);
   syncFrame();
   setupRain();
   primeWeather(S.weather);
   buildBackground();
-  showLabel(S.windowStyle === 4 ? '飞机舷窗' : '火车窗');
+  showLabel(S.windowStyle === 4 ? '飞机舷窗' : S.windowStyle === 2 ? '火车窗' : '无框玻璃');
 }
 
 var uiTick = 0, lastUiLevel = -1;
@@ -2438,7 +2430,7 @@ if (debugMode) window.__mist = {
   stats: function () {
     function avg(a) { var sum = 0; for (var i = 0; i < a.length; i++) sum += a[i]; return sum / Math.max(1, a.length); }
     var centre = ((dh * 0.48) | 0) * dw + ((dw * 0.5) | 0);
-    return { gl: useGL, scene: S.sceneIndex, photoReady: !!SCENES[S.sceneIndex].image,
+    return { gl: useGL, scene: S.sceneIndex, photoNumber: SCENES[S.sceneIndex].id, photoReady: !!SCENES[S.sceneIndex].image,
       rain: rainDrops.length, rainStreaks: rainStreaks.length, snow: snowFlakes.length, rainAmt: S.rainAmt, snowAmt: S.snowAmt,
       custom: !!S.customImg, windowStyle: S.windowStyle, melt: S.melt, weather: S.weather,
       fps: 1000 / Math.max(1, avg(qaFrames)), cpuMs: avg(qaCpu), frames: qaTicks,
@@ -2473,8 +2465,8 @@ function frame(t) {
       updateDrops(dt);
       mergeDrops();
       naturalSpawn(dt);
-      fogSum = relaxFog(f, m);
-      diffuseFog(0.030 * m.df, f);
+      fogSum = relaxFog(f * MELT_TIME, m);
+      diffuseFog(0.030 * m.df, f * MELT_TIME);
       writeFogCanvas();
       writeDropCanvas();
       uploadSimTextures();
@@ -2507,6 +2499,7 @@ function frame(t) {
 /* ================================================================ 尺寸 */
 function syncFrame() {
   aperture = MIST_WINDOWS.draw(frameCanvas, S.windowStyle, S.cssW, S.cssH, S.dpr);
+  btnWindow.setAttribute('aria-label', '切换窗户，当前：' + (S.windowStyle === 4 ? '飞机舷窗' : S.windowStyle === 2 ? '火车窗' : '无框玻璃'));
   hintEl.innerHTML=S.windowStyle===4?'按住玻璃哈气，划过写字<b>拖动上方把手，开合遮光板</b>':'按住玻璃哈气，划过写字<b>也可以按住空格，或打开麦克风</b>';
   hintEl.style.top = S.windowStyle ? ((aperture.y + aperture.h * 0.47) / S.cssH * 100) + '%' : '57%';
   if (!MIST_WINDOWS.contains(aperture, S.lastPointer.x * S.cssW, S.lastPointer.y * S.cssH)) {

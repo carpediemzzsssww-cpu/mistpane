@@ -88,7 +88,7 @@
     document.body.setAttribute('data-window',String(type));
     shadeEl.hidden=handle.hidden=type!==4;
     position=clamp(position,0,1);
-    if(!type){ambient.style.opacity='0';canvas.style.filter='';return r;}
+    if(!type){updateLight();return r;}
     var wall=c.createRadialGradient(W*.48,H*.35,0,W*.5,H*.5,Math.max(W,H)*.85);
     var colors=type===4?['#f6f4ef','#e5e3dd','#c8c8c2']:type===2?['#e3e0d7','#cbc8bd','#afafa5']:type===3?['#303a3d','#20292c','#141b20']:['#444843','#2c302e','#1e2423'];
     wall.addColorStop(0,colors[0]);wall.addColorStop(.6,colors[1]);wall.addColorStop(1,colors[2]);
