@@ -21,9 +21,9 @@
       safeInset = controls ? Math.max(0, (parseFloat(getComputedStyle(controls).bottom) || 18) - 18) : 0;
     }
     var safeBottom = safeInset;
-    var viewW = landscape ? Math.max(180, W - 194) : W;
+    var viewW = landscape ? Math.max(180, W - 142) : W;
     var top = landscape ? 20 : 42;
-    var bottom = landscape ? 20 : 172 + safeBottom;
+    var bottom = landscape ? 20 : 116 + safeBottom;
     var avail = Math.max(160, H - top - bottom), w = W, h = H;
     if(type===1) { w=Math.min(viewW*.83,avail*1.45); h=Math.min(avail*.83,w/(phone?.83:1.45)); }
     if(type===2) { h=Math.min(avail*.83,viewW*.79/.78); w=h*.78; }
@@ -245,7 +245,37 @@
     if(r.type===4&&y<r.y+edge()+10)return false;
     return hit.isPointInPath(r.path,x,y);
   }
-  window.MIST_WINDOWS={geometry:geometry,draw:draw,contains:contains,tick:tick,
+  // Composite the physical window only; DOM controls never enter a saved picture.
+  function snapshot(c) {
+    if(!active||!active.type)return;
+    var r=active,plane=r.type===4;
+    function layer(canvas,x,y,w,h,brightness) {
+      c.save();
+      if(brightness<.999 && 'filter' in c) {
+        c.filter='brightness('+brightness+')'; c.drawImage(canvas,x,y,w,h);
+      } else if(brightness<.999) {
+        // Canvas filters are absent in older Safari; keep cabin darkness there too.
+        var copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;
+        var cc=copy.getContext('2d');cc.drawImage(canvas,0,0);
+        var pixels=cc.getImageData(0,0,copy.width,copy.height),a=pixels.data;
+        for(var i=0;i<a.length;i+=4){a[i]*=brightness;a[i+1]*=brightness;a[i+2]*=brightness;}
+        cc.putImageData(pixels,0,0);c.drawImage(copy,x,y,w,h);
+      } else c.drawImage(canvas,x,y,w,h);
+      c.restore();
+    }
+    if(plane)layer(shadeEl,r.x,r.y,r.w,r.h,.18+.82*light);
+    layer(frameEl,0,0,r.W,r.H,plane?.20+.80*light:1);
+    if(!plane)return;
+    c.save();c.fillStyle='rgba(21,35,49,'+((1-light)*.13)+')';c.fillRect(0,0,r.W,r.H);c.restore();
+    var cx=r.x+r.w*.5,cy=r.y+Math.min(r.h-27,edge()-13),v=.18+.82*light;
+    function rgb(a){return 'rgb('+a.map(function(n){return Math.round(n*v);}).join(',')+')';}
+    var g=c.createLinearGradient(0,cy-4.5,0,cy+4.5);
+    g.addColorStop(0,rgb([145,142,131]));g.addColorStop(.37,rgb([177,174,163]));
+    g.addColorStop(.75,rgb([223,219,209]));g.addColorStop(1,rgb([237,233,223]));
+    c.save();c.shadowColor='rgba(54,49,39,.20)';c.shadowBlur=3;c.shadowOffsetY=1;
+    c.fillStyle=g;c.beginPath();c.ellipse(cx,cy,28,4.5,0,0,Math.PI*2);c.fill();c.restore();
+  }
+  window.MIST_WINDOWS={geometry:geometry,draw:draw,contains:contains,tick:tick,snapshot:snapshot,
     breathPoint:function(r){
       if(!r||r.type!==4)return {x:r.x+r.w*.5,y:r.y+r.h*.5};
       var top=r.y+edge()+12;if(top>r.y+r.h-35)return null;

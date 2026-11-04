@@ -1,6 +1,6 @@
 # 哈气 · Mistpane
 
-![手机哈气按钮与小雨、大雨效果](docs/preview.webp)
+![手动涂雾、雨雪与拟物按键](docs/preview.webp)
 
 > 窗外的灯还亮着。在玻璃上，写一个字。
 
@@ -10,15 +10,15 @@
 
 ## 怎么玩
 
-- 手机按住「哈气」按钮，松开后在玻璃上写字；也可以长按玻璃或按住键盘空格。
+- 长按玻璃约 0.7 秒起雾，保持按住并拖动可以涂开雾气；松手后，再划就是擦雾写字。桌面也可按住空格哈气。
 - 点「照片」直接切换下一张。保留原编号 01、02、03、04、07、14、18、20 的八张风景，换窗型时保留当前照片。
-- 天气按钮依次切换「晴 → 小雨 → 大雨 → 雪」。双击玻璃也可以；拖动写字不会触发换天气。
-- 点「消散」在慢、中、快三档之间切换，三档均保留较慢的融化速度。小雨以细短雨丝和小水珠为主，大雨更密、更快，玻璃外侧逐渐积起较大的水滴。
+- 天气按钮依次切换「晴 → 雨 → 雪」。双击玻璃也可以；拖动写字不会触发换天气。
+- 点「消散」在慢、中、快三档之间切换，三档均保留较慢的融化速度。雨量会自然渐强、渐弱，玻璃外侧的水珠断续滑落，留下湿痕。
 - 拖动飞机舷窗的把手或遮光板，可停在中间；轻点打开 / 关闭。键盘方向键调节，Home 打开、End 关闭。
-- 点「麦克风」授权后，靠近手机麦克风轻轻哈气；声音在本机实时分析，不录制或上传。再次点击关闭，切到后台也会停止；不可用时继续用「按住哈气」。
 - 「上传」可以使用自己的照片，仅在当前浏览器内处理。
+- 「保存」定格当下的窗景、雾字和水滴，导出不带操作按钮的 PNG。电脑直接下载；手机打开图片预览，可长按保存，或使用系统分享 / 下载。
 
-手机竖屏将哈气 / 麦克风放在上排，五个带短标签的环境按钮放在下排；横屏移到右侧，给玻璃留出书写空间。
+六枚奶白色按键收在底部一排；手机横屏变为右侧两列，给玻璃留出书写空间。全部操作使用触摸或鼠标，不请求麦克风。
 
 ## 本地运行
 
@@ -37,4 +37,4 @@ npm run build
 
 ## English
 
-A winter window you can breathe on and draw through. Hold the breath button, release it, then write on the glass. Tap the photo button to cycle through eight travel photographs. Optional microphone input responds to breath sounds, with local audio analysis and manual controls available if permission is denied. Choose clear weather, drizzle, heavy rain or snow. Rain intensity changes both distant streaks and water on the outer glass. White aircraft and train windows sit alongside a full-screen frameless view. Portrait and landscape layouts keep the controls reachable. Uploaded photographs stay in your browser. WebGL1 with a simplified Canvas2D fallback; no runtime dependencies.
+A winter window you can mist and draw through. Hold the glass, then drag to spread condensation; release and start a new stroke to wipe it away. Tap to cycle through eight travel photographs. Rain gradually changes intensity, with refracting droplets and wet trails on the outer glass; snow and clear weather are also available. White aircraft and train windows sit alongside a full-screen frameless view. Six tactile controls adapt to portrait and landscape screens. Save the current window, writing and droplets as a PNG without the controls. Mobile offers an image preview for long-press saving or system sharing. Uploaded photographs stay in your browser. No microphone permission; WebGL1 with a simplified Canvas2D fallback and no runtime dependencies.
