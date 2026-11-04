@@ -677,11 +677,12 @@ var BG = { sharp: null, blurA: null, blurB: null, glass: null, t0: null, t1: nul
 
 var qualityTier = 0;
 var fogSum = 0;
-/* 消散三档：蒸发 / 环境重凝 / 边缘扩散 的倍率 */
+/* 消散四档：蒸发 / 环境重凝 / 边缘扩散 的倍率；最后一档保留雾与字迹 */
 var MELT = [
   { ev: 0.45, am: 0.55, ac: 0.55, df: 0.60 },
   { ev: 1.00, am: 1.00, ac: 1.00, df: 1.00 },
-  { ev: 1.95, am: 1.65, ac: 1.60, df: 1.45 }
+  { ev: 1.95, am: 1.65, ac: 1.60, df: 1.45 },
+  { ev: 0, am: 0, ac: 0, df: 0, hold: true }
 ];
 // Slow evaporation, wet-mark fading and edge refill together, independently of drops.
 var MELT_TIME = 0.80;
@@ -940,6 +941,8 @@ function spawnDrop(x, y, r, life) {
 }
 
 function dropTrail(x0, y0, x1, y1, R) {
+  // Droplets still move, while this mode preserves the writing underneath them.
+  if (MELT[S.melt].hold) return;
   var dx = x1 - x0, dy = y1 - y0, len = Math.sqrt(dx * dx + dy * dy);
   var steps = Math.max(1, Math.ceil(len / Math.max(0.6, R * 0.45)));
   if (steps > 24) steps = 24;
@@ -2417,9 +2420,9 @@ function bindButtons() {
   btnWeather.addEventListener('click', function () { nextWeather(); if (this.blur) this.blur(); }, false);
   btnWindow.addEventListener('click', function () { nextWindow(); if (this.blur) this.blur(); }, false);
   btnMelt.addEventListener('click', function () {
-    S.melt = (S.melt + 1) % 3;
-    var text = ['慢', '中', '快'][S.melt];
-    btnMelt.querySelector('span').textContent = '消散·' + text;
+    S.melt = (S.melt + 1) % MELT.length;
+    var text = ['慢', '中', '快', '不融化'][S.melt];
+    btnMelt.querySelector('span').textContent = MELT[S.melt].hold ? text : '消散·' + text;
     btnMelt.setAttribute('aria-label', '切换消散速度，当前：' + text);
     showLabel('消散速度 · ' + text); this.blur();
   });

@@ -1,0 +1,13 @@
+/* Pixel variables work in Chrome 61 and in the platform's safe-area simulator. */
+#controls { bottom:18px; bottom:calc(18px + var(--mist-safe-bottom,0px)); max-width:calc(100% - 20px - var(--mist-safe-left,0px) - var(--mist-safe-right,0px)); }
+#label { top:64px; top:var(--mist-safe-top,64px); }
+#toast { bottom:116px; bottom:calc(116px + var(--mist-safe-bottom,0px)); }
+button:focus { outline:2px solid #8ba084; outline-offset:2px; }
+#shadeHandle:focus { outline:2px solid #8ba084; }
+#savePreview { padding:16px; padding:calc(16px + var(--mist-safe-top,64px)) calc(16px + var(--mist-safe-right,0px)) calc(16px + var(--mist-safe-bottom,0px)) calc(16px + var(--mist-safe-left,0px)); }
+.save-card img { max-height:calc(100vh - 180px); max-height:calc(100vh - 180px - var(--mist-safe-top,64px) - var(--mist-safe-bottom,0px)); -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+@media (max-height:500px) and (orientation:landscape) {
+ #controls { right:12px; right:calc(12px + var(--mist-safe-right,0px)); bottom:auto; top:50%; }
+ #toast { bottom:16px; }
+ .save-card img { max-height:calc(100vh - 56px); max-height:calc(100vh - 56px - var(--mist-safe-top,64px) - var(--mist-safe-bottom,0px)); }
+}
