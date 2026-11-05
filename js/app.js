@@ -626,7 +626,7 @@ function loadScene(index) {
   scene.loading = true;
   if (!scene.preview) {
     var preview = new Image();
-    preview.onload = function () { scene.preview = preview; if (S.sceneIndex === index && !S.customImg && !scene.image) buildBackground(); };
+    preview.onload = function () { scene.preview = preview; if (S.sceneIndex === index && !S.customImg) { if (!scene.image) buildBackground(); } };
     preview.src = scene.thumb;
   }
   var image = new Image();
@@ -660,7 +660,7 @@ var S = {
   down: false, mode: 'wipe', downT: 0, lastMoveT: 0,
   lastX: 0.5, lastY: 0.47, downX: 0.5, downY: 0.47,
   windowStyle: windowMatch && Number(windowMatch[1]) === 0 ? 0 : windowMatch && Number(windowMatch[1]) === 2 ? 2 : 4,
-  rainAmt: 0, snowAmt: 0, melt: 1,
+  rainAmt: 0, snowAmt: 0, melt: 1, userImg: null,
   weather: 'clear', weatherLevel: 0, weatherHold: 0,
   wind: 0, windTarget: 0, windT: 0,
   lastTapT: 0, lastTapX: 0.5, lastTapY: 0.47,
@@ -669,7 +669,8 @@ var S = {
 
 var frameCanvas, aperture = null;
 var stage, glass, flat, flatCtx, hintEl, labelEl, toastEl, ringEl, cursorEl,
-    btnSave, btnMelt, btnScene, btnWeather, btnWindow, btnUpload, fileEl;
+    btnSave, btnMelt, btnScene, btnWeather, btnWindow, btnUpload, fileEl,
+    btnFog, btnPhoto, fileCamEl, photoMenu;
 var useGL = false, gl = null, prog = null, U = null;
 var fogTex = null, dropTex = null, grainTex = null;
 var fogTexReady = false, dropTexReady = false;
@@ -678,11 +679,12 @@ var BG = { sharp: null, blurA: null, blurB: null, glass: null, t0: null, t1: nul
 var qualityTier = 0;
 var fogSum = 0;
 /* 消散四档：蒸发 / 环境重凝 / 边缘扩散 的倍率；最后一档保留雾与字迹 */
+/* 四档要真的玩得出差别（整面起雾到基本散完，实测）：慢约 146 秒、中约 36 秒、快约 11 秒、不融化 */
 var MELT = [
-  { ev: 0.45, am: 0.55, ac: 0.55, df: 0.60 },
-  { ev: 1.00, am: 1.00, ac: 1.00, df: 1.00 },
-  { ev: 1.95, am: 1.65, ac: 1.60, df: 1.45 },
-  { ev: 0, am: 0, ac: 0, df: 0, hold: true }
+  { ev: 0.22, am: 0.40, ac: 0.45, df: 0.40, name: '慢' },
+  { ev: 1.00, am: 1.00, ac: 1.00, df: 1.00, name: '中' },
+  { ev: 4.60, am: 2.20, ac: 2.00, df: 1.90, name: '快' },
+  { ev: 0, am: 0, ac: 0, df: 0, hold: true, name: '不融化' }
 ];
 // Slow evaporation, wet-mark fading and edge refill together, independently of drops.
 var MELT_TIME = 0.80;
@@ -698,6 +700,7 @@ var strokeDist = 0;
 var dw = 0, dh = 0, flen = 0, densityScale = 0.1;
 var fogF = null, wetF = null, bareF = null, resF = null;
 var goalF = null, introK = null, introT = 0;     /* 开场：玻璃先是干净的，水汽一片片凝上来 */
+var patternF = null, patternK = null, bloomUser = false;  /* 「起雾」复用同一张分布图 */
 var fogU8 = null;
 var DROP_CAP = 120;
 var sites = [];
@@ -791,25 +794,28 @@ function initFogArrays() {
     goalF[i] = clamp(0.36 + 0.26 * p + 0.05 * p2 + 0.26 * yy * yy + 0.10 * sstep(0.6, 1, ex), 0.20, 0.86);
     introK[i] = (0.25 + 1.25 * fbm(nk, x / 18, y / 18)) * (0.7 + 0.5 * yy + 0.4 * ex);
   }
+  patternF = goalF.slice(); patternK = introK.slice(); bloomUser = false;
 }
 
 function setupSim(preserve) {
   var sz = simSize();
   if (preserve && fogCanvas && dw > 0 && (sz.w !== dw || sz.h !== dh)) {
     /* 尺寸变化时拉伸旧密度图，保留用户已擦出的笔迹 */
-    var old = fogCanvas, oFog = fogF, oWet = wetF, oBare = bareF, oRes = resF, oGoal = goalF, oK = introK, oW = dw, oH = dh;
+    var old = fogCanvas, oFog = fogF, oWet = wetF, oBare = bareF, oRes = resF, oGoal = goalF, oK = introK, oP = patternF, oPK = patternK, oW = dw, oH = dh;
     var nc = mkCanvas(sz.w, sz.h), n2 = nc.getContext('2d');
     n2.imageSmoothingEnabled = true;
     n2.drawImage(old, 0, 0, sz.w, sz.h);
     dw = sz.w; dh = sz.h; flen = dw * dh; densityScale = sz.s;
     fogF = new Float32Array(flen); wetF = new Float32Array(flen); bareF = new Float32Array(flen); resF = new Float32Array(flen);
     goalF = oGoal ? new Float32Array(flen) : null; introK = oGoal ? new Float32Array(flen) : null;
+    patternF = new Float32Array(flen); patternK = new Float32Array(flen);
     for (var i = 0; i < flen; i++) {
       var x = i % dw, y = (i / dw) | 0;
       var ox = Math.min(oW - 1, (x * oW / dw) | 0), oy = Math.min(oH - 1, (y * oH / dh) | 0);
       var oi = oy * oW + ox;
       fogF[i] = oFog[oi]; wetF[i] = oWet[oi]; bareF[i] = oBare[oi]; resF[i] = oRes[oi];
       if (oGoal) { goalF[i] = oGoal[oi]; introK[i] = oK[oi]; }
+      patternF[i] = oP[oi]; patternK[i] = oPK[oi];
     }
     fogCanvas = nc; fogCtx = n2;
   } else {
@@ -835,7 +841,9 @@ function depositOne(ox, oy, R, amp) {
     kx = ((px + 0.5 - ox) / R) * half + half;
     ky = ((py + 0.5 - oy) / R) * half + half;
     if (kx < 0 || kx >= BK || ky < 0 || ky >= BK) continue;
-    fogF[py * dw + px] += amp * breathKernel[(ky | 0) * BK + (kx | 0)];
+    var ii = py * dw + px;
+    /* 写过的地方留着一点手指的油，水汽凝得稍薄：旧字隐约浮出来 */
+    fogF[ii] += amp * breathKernel[(ky | 0) * BK + (kx | 0)] * (1 - 0.30 * bareF[ii]);
   }
 }
 
@@ -874,6 +882,8 @@ function stampWipe(cx, cy, R) {
     var F0 = fogF[i];
     fogF[i] *= (1 - erase);
     resF[i] *= (1 - erase);
+    /* 起雾还在凝的时候写的字，不会再被这次起雾盖掉 */
+    if (goalF && goalF[i] > fogF[i]) goalF[i] = fogF[i];
     /* 手指把水推到笔画边上，堆成一圈稍大的水珠 */
     if (q > 0.92) { var ridge = Math.min(1, F0 * 0.85 + 0.12) * (1 - sstep(1.12, 1.3, q)); if (ridge > resF[i]) resF[i] = ridge; }
     var wv = (1 - sstep(0.15, 1.25, q)) * 0.95;
@@ -990,6 +1000,7 @@ function dropTrail(x0, y0, x1, y1, R) {
       var e = 1 - sstep(0, 1, q);
       got += fogF[i2] * 0.82 * e;
       fogF[i2] *= (1 - 0.82 * e);
+      if (goalF && goalF[i2] > fogF[i2]) goalF[i2] = fogF[i2];
       resF[i2] *= (1 - 0.85 * e);
       var wv = (1 - sstep(0, 1.2, q)) * 0.85;
       if (wv > wetF[i2]) wetF[i2] = wv;
@@ -1129,15 +1140,26 @@ function naturalSpawn(dt) {
 
 /* 开场：干净的玻璃在一两秒里由下往上、一片片凝上水汽 */
 function introFog(dt) {
-  if (!goalF || MELT[S.melt].hold) return;
+  if (!goalF || (MELT[S.melt].hold && !bloomUser)) return;
   introT += dt;
   var k = sstep(0.15, 1.4, introT) * dt * 1.6;
   for (var i = 0; i < flen; i++) {
-    if (bareF[i] > 0.05) continue;
+    if (!bloomUser && bareF[i] > 0.05) continue;
     var g = goalF[i], F = fogF[i];
     if (F < g) fogF[i] = F + (g - F) * Math.min(1, k * introK[i]);
   }
-  if (introT > 5) { goalF = null; introK = null; }
+  if (introT > 5) { goalF = null; introK = null; bloomUser = false; }
+}
+
+/* 一键起雾：整面窗由下往上重新凝满。擦过的地方凝得稍薄一点，旧字留下很淡的痕迹 */
+function fogAll() {
+  if (!fogF || !patternF) return;
+  goalF = new Float32Array(flen);
+  for (var i = 0; i < flen; i++) {
+    var g = Math.min(0.92, patternF[i] * 1.08 + 0.10);
+    goalF[i] = Math.max(fogF[i], g * (1 - 0.16 * bareF[i]));
+  }
+  introK = patternK; introT = 0.12; bloomUser = true;
 }
 
 /* 手指擦过：碰到的水珠被抹掉 */
@@ -1216,6 +1238,22 @@ function primeWeather(mode) {
   }
   if (mode === 'snow' && !snowFlakes.length) for (var j = 0; j < 72 * n; j++) spawnSnow(b, true);
 }
+var WINDOW_UI = {
+  4: { name: '飞机舷窗', short: '舷窗', icon: '<rect x="6" y="2.8" width="12" height="18.4" rx="6"></rect><path d="M8.2 7.5h7.6"></path>' },
+  2: { name: '火车窗', short: '火车窗', icon: '<rect x="4" y="4.5" width="16" height="15" rx="2.5"></rect><path d="M4 12h16"></path>' },
+  0: { name: '无框玻璃', short: '无框', icon: '<path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"></path>' }
+};
+function updateWindowButton() {
+  var w = WINDOW_UI[S.windowStyle] || WINDOW_UI[4];
+  btnWindow.querySelector('svg').innerHTML = w.icon;
+  btnWindow.querySelector('span').textContent = w.short;
+  btnWindow.setAttribute('aria-label', '切换窗户，当前：' + w.name);
+}
+function updateMeltButton() {
+  var m = MELT[S.melt];
+  btnMelt.querySelector('span').textContent = m.hold ? m.name : '消散·' + m.name;
+  btnMelt.setAttribute('aria-label', '切换消散速度，当前：' + m.name);
+}
 function updateWeatherButton() {
   var names = { clear: '晴', rain: '雨', snow: '雪' };
   var paths = {
@@ -1227,6 +1265,7 @@ function updateWeatherButton() {
   btnWeather.querySelector('span').textContent = names[S.weather];
   btnWeather.setAttribute('aria-label', '切换天气，当前：' + names[S.weather]);
   btnWeather.title = '当前：' + names[S.weather] + ' · 晴 / 雨 / 雪';
+  btnWeather.querySelector('svg').setAttribute('viewBox', '0 0 24 24');
 }
 function setWeather(mode, level, name) {
   S.weather = mode;
@@ -2326,7 +2365,7 @@ function fakePointerUp(cancelled) {
 function targetInDock(target) {
   var el = target;
   while (el && el !== document) {
-    if (el.id === 'controls' || el.id === 'shadeHandle' || el.id === 'dock' || el.id === 'btnScene' ||
+    if (el.id === 'controls' || el.id === 'topbar' || el.id === 'shadeHandle' || el.id === 'dock' || el.id === 'btnScene' ||
         el.id === 'btnWeather' || el.id === 'btnWindow' || el.id === 'btnUpload') return true;
     el = el.parentNode;
   }
@@ -2428,6 +2467,7 @@ function bindKeys() {
       return;
     }
     if (k === 'c' || k === 'C') nextScene();
+    if (k === 'f' || k === 'F') { fogAll(); hideHint(); }
   }, false);
   window.addEventListener('keyup', function (e) {
     var k = e.key || e.code;
@@ -2476,13 +2516,27 @@ function clearLabel() {
 function selectScene(index) {
   S.sceneIndex = index;
   S.customImg = null;
+  closePhotoMenu();
   loadScene(index);
   buildBackground();
   clearLabel();
   loadScene((index + 1) % SCENES.length);
   hideHint();
 }
-function nextScene() { selectScene((S.sceneIndex + 1) % SCENES.length); }
+/* 换窗景：只做一件事，换下一张（用着自己的照片时，回到预设的下一张） */
+function nextScene() {
+  hideHint();
+  selectScene(S.customImg ? S.sceneIndex : (S.sceneIndex + 1) % SCENES.length);
+}
+function openPhotoMenu() {
+  photoMenu.hidden = false;
+  btnPhoto.setAttribute('aria-expanded', 'true');
+}
+function closePhotoMenu() {
+  if (!photoMenu || photoMenu.hidden) return;
+  photoMenu.hidden = true;
+  btnPhoto.setAttribute('aria-expanded', 'false');
+}
 
 function nextWindow() {
   suspendInput();
@@ -2610,7 +2664,7 @@ function frame(t) {
 /* ================================================================ 尺寸 */
 function syncFrame() {
   aperture = MIST_WINDOWS.draw(frameCanvas, S.windowStyle, S.cssW, S.cssH, S.dpr);
-  btnWindow.setAttribute('aria-label', '切换窗户，当前：' + (S.windowStyle === 4 ? '飞机舷窗' : S.windowStyle === 2 ? '火车窗' : '无框玻璃'));
+  updateWindowButton();
   hintEl.innerHTML='长按涂雾 · 划过写字<b>'+(S.windowStyle===4?'上方把手可开合遮光板':'松手后，再划就能擦开雾气')+'</b>';
   hintEl.style.left = aperture.x + 'px'; hintEl.style.width = aperture.w + 'px'; hintEl.style.right = 'auto'; hintEl.style.padding = '0 12px';
   hintEl.style.top = S.windowStyle ? ((aperture.y + aperture.h * 0.47) / S.cssH * 100) + '%' : '57%';
@@ -2660,8 +2714,11 @@ function bindDom() {
   btnScene = document.getElementById('btnScene');
   btnWeather = document.getElementById('btnWeather');
   btnWindow = document.getElementById('btnWindow');
-  btnUpload = document.getElementById('btnUpload');
   fileEl = document.getElementById('file');
+  fileCamEl = document.getElementById('fileCam');
+  btnFog = document.getElementById('btnFog');
+  photoMenu = document.getElementById('photoMenu');
+  btnPhoto = document.getElementById('btnPhoto');
 }
 
 function bindButtons() {
@@ -2673,17 +2730,35 @@ function bindButtons() {
   btnWindow.addEventListener('click', function () { nextWindow(); if (this.blur) this.blur(); }, false);
   btnMelt.addEventListener('click', function () {
     S.melt = (S.melt + 1) % MELT.length;
-    var text = ['慢', '中', '快', '不融化'][S.melt];
-    btnMelt.querySelector('span').textContent = MELT[S.melt].hold ? text : '消散·' + text;
-    btnMelt.setAttribute('aria-label', '切换消散速度，当前：' + text);
-    showLabel('消散速度 · ' + text); this.blur();
+    updateMeltButton();
+    showLabel('消散速度 · ' + MELT[S.melt].name);
+    this.blur();
   });
-  btnUpload.addEventListener('click', function () { fileEl.click(); if (this.blur) this.blur(); }, false);
+  updateMeltButton();
+  updateWindowButton();
+  btnFog.addEventListener('click', function () {
+    fogAll(); hideHint();
+    btnFog.classList.remove('pulse'); void btnFog.offsetWidth; btnFog.classList.add('pulse');
+    if (this.blur) this.blur();
+  }, false);
+  /* 我的照片：手机上「拍一张 / 从相册选」，电脑上只有「选一张照片」 */
+  if (finePointer) { document.getElementById('btnCamera').hidden = true; document.getElementById('btnAlbum').lastChild.textContent = '选一张照片'; }
+  document.getElementById('btnCamera').addEventListener('click', function () { closePhotoMenu(); fileCamEl.click(); }, false);
+  btnPhoto.addEventListener('click', function (e) {
+    if (finePointer) { fileEl.click(); if (this.blur) this.blur(); return; }
+    if (photoMenu.hidden) openPhotoMenu(); else closePhotoMenu();
+    e.stopPropagation();
+  }, false);
+  document.getElementById('btnAlbum').addEventListener('click', function () { closePhotoMenu(); fileEl.click(); }, false);
+  document.addEventListener('pointerdown', function (e) { if (!photoMenu.contains(e.target) && !btnPhoto.contains(e.target)) closePhotoMenu(); }, true);
+  document.addEventListener('touchstart', function (e) { if (!photoMenu.contains(e.target) && !btnPhoto.contains(e.target)) closePhotoMenu(); }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !photoMenu.hidden) { closePhotoMenu(); btnPhoto.focus(); } }, false);
 
-  fileEl.addEventListener('change', function () {
+  function onPhotoPicked() {
+    var input = this;
     try {
-      var fl = fileEl.files && fileEl.files[0];
-      fileEl.value = '';            /* 立刻清空：同一张图也能再次选择 */
+      var fl = input.files && input.files[0];
+      input.value = '';            /* 立刻清空：同一张图也能再次选择 */
       if (!fl) return;
       if (fl.type && fl.type.indexOf('image/') !== 0) {
         showToast('请选择一张图片作为背景', 2400);
@@ -2693,9 +2768,9 @@ function bindButtons() {
       var img = new Image();
       img.onload = function () {
         try {
-          S.customImg = img;
+          S.customImg = S.userImg = img;
           buildBackground();
-          clearLabel();
+                  clearLabel();
         } catch (err) { throw makeDiagError('BG_UPLOAD', err); }
         try { URL.revokeObjectURL(url); } catch (e) {}
       };
@@ -2707,7 +2782,9 @@ function bindButtons() {
     } catch (err) {
       throw makeDiagError('BG_SELECT', err);
     }
-  }, false);
+  }
+  fileEl.addEventListener('change', onPhotoPicked, false);
+  fileCamEl.addEventListener('change', onPhotoPicked, false);
 }
 
 function makeDiagError(where, err) {

@@ -21,9 +21,9 @@
       safeInset = controls ? Math.max(0, (parseFloat(getComputedStyle(controls).bottom) || 18) - 18) : 0;
     }
     var safeBottom = safeInset;
-    var viewW = landscape ? Math.max(180, W - 142) : W;
-    var top = landscape ? 20 : 42;
-    var bottom = landscape ? 20 : 116 + safeBottom;
+    var viewW = landscape ? Math.max(180, W - 152) : W;
+    var top = landscape ? 20 : 80;
+    var bottom = landscape ? 20 : 92 + safeBottom;
     var avail = Math.max(160, H - top - bottom), w = W, h = H;
     if(type===1) { w=Math.min(viewW*.83,avail*1.45); h=Math.min(avail*.83,w/(phone?.83:1.45)); }
     if(type===2) { h=Math.min(avail*.83,viewW*.79/.78); w=h*.78; }
