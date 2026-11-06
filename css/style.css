@@ -1,0 +1,208 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  font-family: -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+}
+
+#glass {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: block;
+  touch-action: none;
+  cursor: default;
+}
+
+/* 开场提示：画面中央偏下，像贴在玻璃后面的一行字，出过一次雾就淡掉 */
+.hint {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 58%;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.6s ease 0.8s;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45);
+}
+.hint.show {
+  opacity: 1;
+}
+.hint.gone {
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+.hint-title {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 300;
+  letter-spacing: 0.32em;
+  color: rgba(255, 255, 255, 0.82);
+}
+.hint-sub {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.5);
+}
+.hint-mic {
+  pointer-events: auto;
+  margin-left: 0.9em;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: rgba(255, 255, 255, 0.78);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+}
+.hint-mic::before {
+  content: '·';
+  margin-right: 0.9em;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* 几乎没有 UI：左下角三行小字 */
+.ui {
+  position: fixed;
+  left: 18px;
+  left: max(18px, env(safe-area-inset-left));
+  bottom: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  opacity: 0.62;
+  transition: opacity 0.6s ease;
+}
+.ui > * + * {
+  margin-left: 18px;
+}
+.ui.dim {
+  opacity: 0.12;
+}
+.ui button,
+.ui .upload {
+  position: relative;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.86);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ui button:focus,
+.ui .upload:focus-within {
+  outline: none;
+}
+.ui button:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 4px;
+}
+.ui button.on::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 50%;
+  background: rgba(255, 236, 210, 0.9);
+}
+.ui .upload input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.credit {
+  position: fixed;
+  right: 18px;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: 20px;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  max-width: 60vw;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: right;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 1.2s ease;
+  pointer-events: none;
+}
+.credit.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.credit a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 72px;
+  top: max(72px, calc(env(safe-area-inset-top) + 64px));
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(10, 12, 14, 0.42);
+  border-radius: 999px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.toast.show {
+  opacity: 1;
+}
+
+.debug {
+  position: fixed;
+  left: 8px;
+  top: 8px;
+  margin: 0;
+  font: 11px/1.4 ui-monospace, Menlo, monospace;
+  color: #9f9;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 4px 6px;
+  pointer-events: none;
+  white-space: pre;
+}
+
+@media (max-width: 420px) {
+  .ui > * + * {
+    margin-left: 14px;
+  }
+  .credit {
+    bottom: 52px;
+    bottom: max(52px, calc(env(safe-area-inset-bottom) + 36px));
+    left: 18px;
+    right: 18px;
+    max-width: none;
+    text-align: left;
+  }
+}

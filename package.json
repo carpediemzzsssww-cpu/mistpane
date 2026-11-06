@@ -1,0 +1,13 @@
+{
+  "name": "fog-window",
+  "private": true,
+  "version": "0.1.0",
+  "description": "对着冰冷的窗户哈气，在水雾上用手指画画（WebGL1，无构建步骤）",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>哈气</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="glass" aria-label="起雾的窗玻璃，拖动手指擦开水汽"></canvas>
+
+<div id="hint" class="hint" aria-live="polite">
+  <p id="hintTitle" class="hint-title"></p>
+  <p class="hint-sub"><span id="hintSub"></span><button id="hintMic" class="hint-mic" type="button"></button></p>
+</div>
+
+<nav id="ui" class="ui">
+  <button id="btnMic" type="button"></button>
+  <button id="btnScene" type="button"></button>
+  <label class="upload"><span id="btnUploadLabel"></span><input id="fileInput" type="file" accept="image/*"></label>
+</nav>
+
+<div id="credit" class="credit"></div>
+<div id="toast" class="toast" role="status"></div>
+<script>
+  // ?debug 时显示调试信息
+  if (/[?&]debug/.test(location.search)) {
+    var d = document.createElement('pre');
+    d.id = 'debug';
+    d.className = 'debug';
+    document.body.appendChild(d);
+  }
+</script>
+<script src="js/content.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/drops.js"></script>
+<script src="js/breath.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/fallback.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
