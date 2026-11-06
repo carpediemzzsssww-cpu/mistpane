@@ -27,17 +27,17 @@
 </div>
 
 <div id="topbar" role="group" aria-label="窗户设置">
-  <button type="button" class="tb" id="btnWeather" aria-label="切换天气，当前：晴" title="晴 / 雨 / 雪"><svg viewBox="0 0 24 24" aria-hidden="true"></svg><span>晴</span></button>
-  <button type="button" class="tb" id="btnWindow" aria-label="切换窗户，当前：飞机舷窗" title="飞机舷窗 / 火车窗 / 无框玻璃"><svg viewBox="0 0 24 24" aria-hidden="true"></svg><span>舷窗</span></button>
-  <button type="button" class="tb" id="btnMelt" aria-label="切换消散速度，当前：中" title="消散：慢 / 中 / 快 / 不融化"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0zM11.5 10v7"></path></svg><span>消散·中</span></button>
+  <button type="button" class="tb" id="btnWeather" data-key="W" aria-label="切换天气，当前：晴" title="晴 / 雨 / 雪（W）"><svg viewBox="0 0 24 24" aria-hidden="true"></svg><span>晴</span></button>
+  <button type="button" class="tb" id="btnWindow" data-key="V" aria-label="切换窗户，当前：飞机舷窗" title="飞机舷窗 / 火车窗 / 无框玻璃（V）"><svg viewBox="0 0 24 24" aria-hidden="true"></svg><span>舷窗</span></button>
+  <button type="button" class="tb" id="btnMelt" data-key="M" aria-label="切换消散速度，当前：中" title="消散：慢 / 中 / 快 / 不融化（M）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0zM11.5 10v7"></path></svg><span>消散·中</span></button>
 </div>
 
 <div id="controls" aria-label="玻璃窗操作">
   <div id="dock" role="group" aria-label="主要操作">
-    <button type="button" class="btn" id="btnScene" aria-label="换下一张窗景照片" title="换下一张（C）"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="15" height="13" rx="2"></rect><path d="M7 3.5h12a2 2 0 0 1 2 2v10"></path><circle cx="8" cy="10.5" r="1.4"></circle><path d="M3.5 16.5l4-3.4 3 2.5 2.4-2 4.6 3.6"></path></svg><span>换窗景</span></button>
+    <button type="button" class="btn" id="btnScene" data-key="C" aria-label="换下一张窗景照片" title="换下一张（C 或 ← →）"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="15" height="13" rx="2"></rect><path d="M7 3.5h12a2 2 0 0 1 2 2v10"></path><circle cx="8" cy="10.5" r="1.4"></circle><path d="M3.5 16.5l4-3.4 3 2.5 2.4-2 4.6 3.6"></path></svg><span>换窗景</span></button>
     <button type="button" class="btn" id="btnPhoto" aria-label="用我的照片：拍一张或从相册选" aria-haspopup="true" aria-expanded="false" title="用我的照片"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h7"></path><path d="M4.5 16l4.2-3.8 3 2.6 2.3-1.9 4.5 3.6"></path><path d="M18 3v6M15 6h6"></path></svg><span>我的照片</span></button>
-    <button type="button" class="btn" id="btnFog" aria-label="让整面窗凝满雾气" title="整面起雾（F）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.5h10.3a4 4 0 0 0 .5-7.97 6 6 0 0 0-11.4-1.4A4.7 4.7 0 0 0 7.2 18.5z"></path></svg><span>起雾</span></button>
-    <button type="button" class="btn" id="btnSave" aria-label="保存当前窗景图片" title="保存图片"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5l1.5-2h5l1.5 2h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z"></path><circle cx="12" cy="12.5" r="4"></circle></svg><span>保存</span></button>
+    <button type="button" class="btn" id="btnFog" data-key="F" aria-label="让整面窗凝满雾气" title="整面起雾（F）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.5h10.3a4 4 0 0 0 .5-7.97 6 6 0 0 0-11.4-1.4A4.7 4.7 0 0 0 7.2 18.5z"></path></svg><span>起雾</span></button>
+    <button type="button" class="btn" id="btnSave" data-key="S" aria-label="保存当前窗景图片" title="保存图片（S）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5l1.5-2h5l1.5 2h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z"></path><circle cx="12" cy="12.5" r="4"></circle></svg><span>保存</span></button>
   </div>
   <div id="photoMenu" role="menu" aria-label="我的照片" hidden>
     <button type="button" role="menuitem" id="btnCamera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5l1.5-2h5l1.5 2h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z"></path><circle cx="12" cy="12.5" r="4"></circle></svg>拍一张</button>

@@ -12,16 +12,16 @@ css=css.replace(/inset:0; /g,'').replace(/env\(safe-area-inset-(top|bottom|left|
 fs.writeFileSync(path.join(dist,'css/style.css'),css);fs.copyFileSync(path.join(root,'minitool/overrides.css'),path.join(dist,'css/minitool.css'));
 for(const name of ['save.js','platform.js'])fs.copyFileSync(path.join(root,'minitool',name),path.join(dist,'js',name));
 let win=fs.readFileSync(path.join(root,'js/windows.js'),'utf8');
-win=patch(win,'var top = landscape ? 20 : 80;','var top = landscape ? 20 : Math.max(80, MIST_PLATFORM.insets.top + 70);');
+win=patch(win,'var top = landscape ? 20 : desk ? 30 : 80;','var top = landscape ? 20 : desk ? 30 : Math.max(80, MIST_PLATFORM.insets.top + 70);');
 win=patch(win,'var viewW = landscape ? Math.max(180, W - 152) : W;','var safeLeft=MIST_PLATFORM.insets.left, safeRight=MIST_PLATFORM.insets.right;\n    var viewW = Math.max(180, W-safeLeft-safeRight-(landscape?152:0));');
-win=patch(win,'x:type?(viewW-w)/2:0','x:type?safeLeft+(viewW-w)/2:0');fs.writeFileSync(path.join(dist,'js/windows.js'),win);
+win=patch(win,'var cx=viewW/2;','var cx=safeLeft+viewW/2;');fs.writeFileSync(path.join(dist,'js/windows.js'),win);
 let app=fs.readFileSync(path.join(root,'js/app.js'),'utf8');
 app=patch(app,'rainScale = Math.min(0.5, 720 / Math.max(1, S.cssW));','rainScale = Math.min(0.5, (miniLevel?512:720) / Math.max(1, S.cssW), (miniLevel?1024:2048) / Math.max(1, S.cssH));');
 app=patch(app,'var s = Math.min(base, Math.sqrt(cap / Math.max(1, S.cssW * S.cssH)));','var s = Math.min(base, Math.sqrt(cap / Math.max(1, S.cssW * S.cssH)), (miniLevel?1024:2048)/Math.max(S.cssW,S.cssH));');
 app=patch(app,'var qualityTier = 0;','var qualityTier = 1, miniLevel = 0, miniRaf = 0;');
 app=patch(app,'var dpr = Math.min(window.devicePixelRatio || 1, 1.6);',`var pixelBudget=miniLevel?1000000:2000000, edgeBudget=miniLevel?1024:2048;
   var dpr = Math.min(window.devicePixelRatio || 1, miniLevel?1:1.5, Math.sqrt(pixelBudget/(w*h)), edgeBudget/Math.max(w,h));`);
-app=patch(app,'if (w === S.cssW && h === S.cssH && dpr === S.dpr && fogCanvas) return;',`if (w === S.cssW && h === S.cssH && dpr === S.dpr && fogCanvas) {
+app=patch(app,'if (w === S.cssW && h === S.cssH && dpr === S.dpr && fogCanvas && !layoutDirty) return;',`if (w === S.cssW && h === S.cssH && dpr === S.dpr && fogCanvas && !layoutDirty) {
     syncFrame();setupRain();primeWeather(S.weather);buildBackground();return;
   }`);
 app=patch(app,"function frame(t) {\n  window.requestAnimationFrame(frame);",`function frame(t) {

@@ -653,7 +653,7 @@ var S = {
   cssW: 0, cssH: 0, dpr: 1, bufW: 1, bufH: 1,
   sceneIndex: Math.max(0, initialScene), customImg: null,
   holdLevel: 0, holdX: 0, holdY: 0,
-  space: false, spaceLevel: 0,
+  space: false, spaceLevel: 0, rbtn: false, brushScale: 1,
   breathLevel: 0, breathX: 0.5, breathY: 0.47, breathR: 0.16, sustain: 0,
   lastPointer: { x: 0.5, y: 0.47, t: 0 },
   pointerType: 'mouse', pointerId: null,
@@ -2249,8 +2249,9 @@ function updateBreath(dt) {
   var hk = Math.min(1, dt * (holdT ? 5 : 9));
   S.holdLevel += (holdT - S.holdLevel) * hk;
 
-  var sk = Math.min(1, dt * (S.space ? 5.5 : 9));
-  S.spaceLevel += ((S.space ? 1 : 0) - S.spaceLevel) * sk;
+  var spaceOn = S.space || S.rbtn;
+  var sk = Math.min(1, dt * (spaceOn ? 5.5 : 9));
+  S.spaceLevel += ((spaceOn ? 1 : 0) - S.spaceLevel) * sk;
   var lvl = 0, src = null;
   if (S.holdLevel > lvl) { lvl = S.holdLevel; src = 'hold'; }
   if (S.spaceLevel > lvl) { lvl = S.spaceLevel; src = 'space'; }
@@ -2283,7 +2284,7 @@ function brushRadius() {
     var paneSize = aperture && aperture.type ? Math.min(aperture.w, aperture.h) : m;
     return clamp(paneSize * 0.023, 5, 8.5);
   }
-  return clamp(m * 0.017, 12, 22);
+  return clamp(m * 0.017, 12, 22) * S.brushScale;
 }
 
 function fakePointerDown(cx, cy) {
@@ -2375,6 +2376,16 @@ function targetInDock(target) {
 function bindInput() {
   if (window.PointerEvent) {
     stage.addEventListener('pointerdown', function (e) {
+      /* 桌面：右键按住在鼠标处哈气（和空格一样，可以边按边移动） */
+      if (e.pointerType === 'mouse' && e.button === 2 && !targetInDock(e.target)) {
+        S.rbtn = true; S.hoverGlass = true; hideHint();
+        S.lastPointer.x = clamp(e.clientX / Math.max(1, S.cssW), 0, 1);
+        S.lastPointer.y = clamp(e.clientY / Math.max(1, S.cssH), 0, 1);
+        S.lastPointer.t = S.time;
+        try { if (stage.setPointerCapture) stage.setPointerCapture(e.pointerId); } catch (err) {}
+        if (e.preventDefault) e.preventDefault();
+        return;
+      }
       if (e.button !== undefined && e.button > 0) return;
       if (targetInDock(e.target)) return;
       S.pointerType = e.pointerType || 'mouse';
@@ -2411,9 +2422,20 @@ function bindInput() {
       S.pointerId = null;
       fakePointerUp(e && e.type !== 'pointerup');
     }
-    stage.addEventListener('pointerup', up, false);
+    stage.addEventListener('pointerup', function (e) {
+      if (e.pointerType === 'mouse' && e.button === 2) { S.rbtn = false; return; }
+      up(e);
+    }, false);
+    /* 滚轮 / 触控板双指：调笔触粗细（只在桌面鼠标下） */
+    stage.addEventListener('wheel', function (e) {
+      if (!finePointer || targetInDock(e.target)) return;
+      var d = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+      S.brushScale = clamp(S.brushScale * Math.exp(-d * 0.0016), 0.5, 2.2);
+      showLabel('笔触粗细 · ' + Math.round(S.brushScale * 100) + '%');
+      if (e.preventDefault) e.preventDefault();
+    }, { passive: false });
     stage.addEventListener('pointercancel', up, false);
-    stage.addEventListener('lostpointercapture', up, false);
+    stage.addEventListener('lostpointercapture', function (e) { if (e.pointerType === 'mouse') S.rbtn = false; up(e); }, false);
     stage.addEventListener('pointerleave', function (e) {
       S.hoverGlass = false;
       if (e.pointerType === 'mouse') up(e);
@@ -2466,8 +2488,17 @@ function bindKeys() {
       if (e.preventDefault) e.preventDefault();
       return;
     }
-    if (k === 'c' || k === 'C') nextScene();
-    if (k === 'f' || k === 'F') { fogAll(); hideHint(); }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var t2 = e.target && e.target.tagName;
+    if (t2 === 'INPUT' || t2 === 'TEXTAREA') return;
+    if (e.repeat && k !== 'ArrowLeft' && k !== 'ArrowRight') return;
+    if (k === 'c' || k === 'C' || k === 'ArrowRight' || k === 'Right') nextScene();
+    else if (k === 'ArrowLeft' || k === 'Left') prevScene();
+    else if (k === 'f' || k === 'F') { fogAll(); hideHint(); }
+    else if (k === 's' || k === 'S') btnSave.click();
+    else if (k === 'w' || k === 'W') btnWeather.click();
+    else if (k === 'v' || k === 'V') btnWindow.click();
+    else if (k === 'm' || k === 'M') btnMelt.click();
   }, false);
   window.addEventListener('keyup', function (e) {
     var k = e.key || e.code;
@@ -2479,13 +2510,13 @@ function bindKeys() {
     }
   }, false);
   window.addEventListener('blur', function () {
-    S.space = false;
+    S.space = false; S.rbtn = false;
     S.pointerId = null;
     fakePointerUp(true);
   }, false);
 }
 
-function suspendInput() { S.space = false; S.pointerId = null; fakePointerUp(true); }
+function suspendInput() { S.space = false; S.rbtn = false; S.pointerId = null; fakePointerUp(true); }
 document.addEventListener('visibilitychange', function () { if (document.hidden) suspendInput(); });
 window.addEventListener('pagehide', suspendInput);
 
@@ -2527,6 +2558,10 @@ function selectScene(index) {
 function nextScene() {
   hideHint();
   selectScene(S.customImg ? S.sceneIndex : (S.sceneIndex + 1) % SCENES.length);
+}
+function prevScene() {
+  hideHint();
+  selectScene(S.customImg ? S.sceneIndex : (S.sceneIndex - 1 + SCENES.length) % SCENES.length);
 }
 function openPhotoMenu() {
   photoMenu.hidden = false;
@@ -2578,14 +2613,22 @@ function updateGestureUI(dt) {
   var showCursor = finePointer && S.pointerType === 'mouse' && S.hoverGlass && MIST_WINDOWS.contains(aperture, lx, ly) && !MIST_WINDOWS.state().dragging;
   if (showCursor !== cursorOn) { cursorOn = showCursor; cursorEl.style.opacity = showCursor ? '1' : '0'; document.body.classList.toggle('cursor-glass', showCursor); }
   if (showCursor) {
-    var r = brushRadius(), ck = lx.toFixed(1) + ',' + ly.toFixed(1) + ',' + r;
+    var breathing = (S.mode === 'hold' && S.down) || S.space || S.rbtn;
+    var r = brushRadius(), ck = lx.toFixed(1) + ',' + ly.toFixed(1) + ',' + r + (breathing ? 'b' : '');
     if (ck !== cursorKey) {
       cursorKey = ck;
       cursorEl.style.width = cursorEl.style.height = (r * 2) + 'px';
-      cursorEl.style.transform = 'translate3d(' + (lx - r).toFixed(1) + 'px,' + (ly - r).toFixed(1) + 'px,0)' + (S.mode === 'hold' && S.down ? ' scale(1.6)' : '');
+      cursorEl.style.transform = 'translate3d(' + (lx - r).toFixed(1) + 'px,' + (ly - r).toFixed(1) + 'px,0)' + (breathing ? ' scale(1.6)' : '');
     }
   }
+  var idle = deskMode && Date.now() - lastActivity > 3000 && !S.down && (!photoMenu || photoMenu.hidden);
+  if (idle !== idleOn) { idleOn = idle; document.body.classList.toggle('idle', idle); }
 }
+var deskMode = false, idleOn = false, lastActivity = Date.now();
+function markActive() { lastActivity = Date.now(); if (idleOn) { idleOn = false; document.body.classList.remove('idle'); } }
+document.addEventListener('mousemove', markActive, true);
+document.addEventListener('mousedown', markActive, true);
+document.addEventListener('focusin', markActive, true);
 
 /* ================================================================ 主循环 */
 var lastT = 0, perfAcc = 0, perfCnt = 0, adapted = false;
@@ -2665,7 +2708,8 @@ function frame(t) {
 function syncFrame() {
   aperture = MIST_WINDOWS.draw(frameCanvas, S.windowStyle, S.cssW, S.cssH, S.dpr);
   updateWindowButton();
-  hintEl.innerHTML='长按涂雾 · 划过写字<b>'+(S.windowStyle===4?'上方把手可开合遮光板':'松手后，再划就能擦开雾气')+'</b>';
+  if (finePointer) hintEl.innerHTML='按住空格或右键哈气 · 拖动写字<b>滚轮调笔触粗细'+(S.windowStyle===4?' · 上方把手可开合遮光板':'')+'</b>';
+  else hintEl.innerHTML='长按涂雾 · 划过写字<b>'+(S.windowStyle===4?'上方把手可开合遮光板':'松手后，再划就能擦开雾气')+'</b>';
   hintEl.style.left = aperture.x + 'px'; hintEl.style.width = aperture.w + 'px'; hintEl.style.right = 'auto'; hintEl.style.padding = '0 12px';
   hintEl.style.top = S.windowStyle ? ((aperture.y + aperture.h * 0.47) / S.cssH * 100) + '%' : '57%';
   if (!MIST_WINDOWS.contains(aperture, S.lastPointer.x * S.cssW, S.lastPointer.y * S.cssH)) {
@@ -2673,12 +2717,17 @@ function syncFrame() {
     S.lastPointer.y = (aperture.y + aperture.h * 0.5) / S.cssH;
   }
 }
-var resizeTimer = null;
+var resizeTimer = null, layoutDirty = false;
 function applyResize() {
   var w = Math.max(1, window.innerWidth || document.documentElement.clientWidth);
   var h = Math.max(1, window.innerHeight || document.documentElement.clientHeight);
   var dpr = Math.min(window.devicePixelRatio || 1, 1.6);
-  if (w === S.cssW && h === S.cssH && dpr === S.dpr && fogCanvas) return;
+  /* 2K / 4K 大屏：整屏渲染像素控制在 500 万以内（原来 2560×1440 视网膜屏会到 940 万） */
+  if (w * h * dpr * dpr > 5.0e6) dpr = Math.max(0.8, Math.sqrt(5.0e6 / (w * h)));
+  var desk = finePointer && w >= 900 && h >= 520 && w / h >= 1.15;
+  if (desk !== deskMode) { deskMode = desk; document.body.classList.toggle('desk', desk); layoutDirty = true; }
+  if (w === S.cssW && h === S.cssH && dpr === S.dpr && fogCanvas && !layoutDirty) return;
+  layoutDirty = false;
 
   S.cssW = w; S.cssH = h; S.dpr = dpr;
   S.bufW = Math.max(1, Math.round(w * dpr));

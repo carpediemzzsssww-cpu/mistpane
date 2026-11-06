@@ -21,17 +21,23 @@
       safeInset = controls ? Math.max(0, (parseFloat(getComputedStyle(controls).bottom) || 18) - 18) : 0;
     }
     var safeBottom = safeInset;
+    /* 桌面宽屏（app.js 给 body 加 desk）：工具条收在右侧一列，上下不再预留 */
+    var desk = !landscape && document.body.classList.contains('desk'), colW = desk ? 176 : 0;
     var viewW = landscape ? Math.max(180, W - 152) : W;
-    var top = landscape ? 20 : 80;
-    var bottom = landscape ? 20 : 92 + safeBottom;
+    var top = landscape ? 20 : desk ? 30 : 80;
+    var bottom = landscape ? 20 : desk ? 30 : 92 + safeBottom;
     var avail = Math.max(160, H - top - bottom), w = W, h = H;
     if(type===1) { w=Math.min(viewW*.83,avail*1.45); h=Math.min(avail*.83,w/(phone?.83:1.45)); }
     if(type===2) { h=Math.min(avail*.83,viewW*.79/.78); w=h*.78; }
     if(type===3) { w=Math.min(viewW*.80,avail*1.10); h=Math.min(avail*.83,w/(phone?.85:1.10)); }
     if(type===4) { h=Math.min(avail*.83,viewW*.72/.70); w=h*.70; }
     var cy=top+avail*.50;
-    var r={x:type?(viewW-w)/2:0,y:type?cy-h/2:0,w:w,h:h,type:type,W:W,H:H,n:type===4?3.15:type===2?5.0:type===3?7:5};
-    r.rim=w*(type===4?.145:type===2?.09:type===3?.065:.07);
+    var rimK=type===4?.145:type===2?.09:type===3?.065:.07;
+    var cx=viewW/2;
+    /* 窗框外缘碰到右侧工具条时，改在剩余宽度里居中 */
+    if(desk&&type&&cx+w/2+w*rimK+24>W-colW) cx=Math.max(w/2+w*rimK+12,(W-colW)/2);
+    var r={x:type?cx-w/2:0,y:type?cy-h/2:0,w:w,h:h,type:type,W:W,H:H,n:type===4?3.15:type===2?5.0:type===3?7:5};
+    r.rim=w*rimK;
     r.path=path(r,0);
     return r;
   }
