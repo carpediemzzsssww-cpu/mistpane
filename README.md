@@ -39,6 +39,8 @@ npm run dev
 npm run build
 ```
 
+第一版原型（CPU 水汽场 + 麦克风哈气检测，说话不触发）保留在分支 [`archive/prototype-2026-11-02`](https://github.com/carpediemzzsssww-cpu/mistpane/tree/archive/prototype-2026-11-02)。
+
 无运行依赖和外部 CDN，`dist/` 可部署到静态托管。采用 WebGL1，失败时使用简化 Canvas2D 效果。浏览器脚本以 Chrome 61 的语法和 API 为目标；旧内核和手机真机仍需实测。
 
 `?window=4` 为飞机窗，`?window=2` 为火车窗，`?window=0` 为无框玻璃；`?scene=` 使用照片原编号减一，例如 14 号对应 `?scene=13`。已撤下照片的旧链接回到默认阳光云海。`?look=previous` 对照此前雾层，`?look=original` 对照原 HTML 质感。验收说明见 [docs/QA.md](docs/QA.md)。

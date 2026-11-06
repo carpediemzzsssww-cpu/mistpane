@@ -1,6 +1,6 @@
 # Mistpane 小工具独立构建
 
-基于网页版 v0.9.0，按官方 minitool-zip-builder 1.8.0 与 2026-11-04 获取的在线契约适配。浏览器入口、雾气模拟和网页保存逻辑保留原样。
+基于网页版 v0.9.1，按官方 minitool-zip-builder 1.8.0 与 2026-11-04 获取的在线契约适配。浏览器入口、雾气模拟和网页保存逻辑保留原样。
 
 小工具差异：
 
@@ -20,7 +20,7 @@ npm run check:minitool
 从上一级工作区（已解压官方 skill）打包：
 
 ```sh
-node mistpane/scripts/minitool/package-minitool.mjs mistpane/dist-minitool release/mistpane-minitool-v4.zip
+node mistpane/scripts/minitool/package-minitool.mjs mistpane/dist-minitool release/mistpane-minitool-v5.zip
 ```
 
 同名 zip 默认不覆盖，后续改版本号出包。官方 skill 不进 git，发布资源仅 `dist-minitool/` 内的白名单文件；许可证文本放在 `licenses.json`。
